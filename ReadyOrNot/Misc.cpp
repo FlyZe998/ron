@@ -30,29 +30,38 @@ void Cheats::ToggleGodMode() {
 	static bool LastRequestedState = false;
 
 	auto* Player = reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar);
-	if (Player == LastPlayer && GVars.World == LastWorld && GVars.Level == LastLevel &&
-		CVars.GodMode == LastRequestedState)
-		return;
+	const bool ContextChanged = Player != LastPlayer || GVars.World != LastWorld || GVars.Level != LastLevel;
+	if (ContextChanged)
+		Player->bGodMode = false;
 
 	const bool WasGodMode = Player->bGodMode;
+	const bool RequestChanged = CVars.GodMode != LastRequestedState;
+	if (!ContextChanged && !RequestChanged && WasGodMode == CVars.GodMode)
+		return;
+
+	const bool HasAuthority = Player->HasAuthority();
+	bool GodModeApplied = false;
 	if (WasGodMode != CVars.GodMode)
 	{
-		if (GVars.HasAuthority)
+		if (HasAuthority)
+		{
 			Player->Server_ToggleGodMode();
-		else
-			Player->ToggleGodMode();
+			Player->bGodMode = CVars.GodMode;
+			GodModeApplied = true;
+		}
 	}
 
-	if (Player->CharacterHealth && (CVars.GodMode || LastRequestedState || WasGodMode))
+	if (Player->CharacterHealth && (CVars.GodMode || LastRequestedState || WasGodMode) &&
+		(ContextChanged || RequestChanged || GodModeApplied))
 	{
 		Player->CharacterHealth->bEnableIncapacitation = !CVars.GodMode;
 		Player->CharacterHealth->bUnlimited = CVars.GodMode;
-		if (GVars.HasAuthority)
+		if (HasAuthority)
 			Player->CharacterHealth->Server_SetUnlimitedResource(CVars.GodMode);
 		else
 			Player->CharacterHealth->SetUnlimitedResource(CVars.GodMode);
 	}
-	if (CVars.GodMode && !WasGodMode)
+	if (CVars.GodMode && !WasGodMode && (ContextChanged || RequestChanged || GodModeApplied))
 		Player->IncreaseHealth(100000.0f);
 
 	LastPlayer = Player;
