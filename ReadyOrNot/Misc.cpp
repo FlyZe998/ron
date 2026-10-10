@@ -77,11 +77,9 @@ void Cheats::ToggleInfAmmo()
 	static ULevel* LastInfiniteAmmoLevel = nullptr;
 	static bool WasEnabled = false;
 
-	
 	if (!CVars.InfAmmo && !WasEnabled)
 		return;
 
-	
 	if (!GVars.World || !GVars.Level || !GVars.ReadyOrNotChar ||
 		!Utils::IsValidActor(GVars.ReadyOrNotChar))
 	{
@@ -102,7 +100,6 @@ void Cheats::ToggleInfAmmo()
 		return;
 	}
 
-	
 	if (GVars.World != LastInfiniteAmmoWorld || GVars.Level != LastInfiniteAmmoLevel)
 	{
 		LastInfiniteAmmoWeapon = nullptr;
@@ -110,7 +107,6 @@ void Cheats::ToggleInfAmmo()
 		LastInfiniteAmmoLevel = GVars.Level;
 	}
 
-	
 	Gun->bInfiniteAmmo = CVars.InfAmmo;
 
 	if (CVars.InfAmmo)
