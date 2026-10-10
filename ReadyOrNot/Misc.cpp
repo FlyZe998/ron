@@ -91,11 +91,10 @@ void Cheats::ToggleInfAmmo()
 
 	ABaseMagazineWeapon* Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
 
-	
 	if (!Gun || !Utils::IsValidActor(Gun))
 	{
 		LastInfiniteAmmoWeapon = nullptr;
-		WasEnabled = CVars.InfAmmo; 
+		WasEnabled = CVars.InfAmmo;
 		return;
 	}
 
@@ -112,7 +111,6 @@ void Cheats::ToggleInfAmmo()
 	{
 		Gun->ReplenishAmmo();
 
-		
 		if (Gun->GetAmmo() < 1.0f)
 		{
 			FMagazine NewMag;
@@ -143,9 +141,8 @@ void Cheats::PenetrateWalls()
 
 	Gun->CurrentAmmoType.PenetrationDistance = 100000;
 	Gun->CurrentAmmoType.PenetrationLevel = 100;
-	Gun->PenetrationDistance = 100000; 
+	Gun->PenetrationDistance = 100000;
 	Gun->bArmorPiercing = true;
-
 }
 
 void Cheats::AddAutoFire()
@@ -206,10 +203,10 @@ void Cheats::SetFireRate(float FireRateMult)
 
 	auto* Character = reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar);
 	auto* Gun = Character->GetEquippedWeapon();
-	
+
 	printf("Original Fire Rate: %f\n", Gun->FireRate);
 
-	Gun->FireRate = 60.0f / FireRateMult; 
+	Gun->FireRate = 60.0f / FireRateMult;
 }
 
 void Cheats::RemoveSpread()
@@ -246,7 +243,7 @@ void Cheats::RemoveRecoil()
 	}
 
 	APlayerCharacter* Character = reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar);
-	ABaseMagazineWeapon * Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
+	ABaseMagazineWeapon* Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
 
 	Gun->RecoilMultiplierPitch = 0.0f;
 	Gun->RecoilMultiplierYaw = 0.0f;
@@ -400,7 +397,7 @@ void Cheats::ApplyPersistentWeaponSettings()
 
 void Cheats::AddMag()
 {
-	if (!GVars.ReadyOrNotChar || !GVars.PlayerController || !GVars.HasAuthority) 
+	if (!GVars.ReadyOrNotChar || !GVars.PlayerController || !GVars.HasAuthority)
 		return;
 
 	auto* Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
@@ -605,7 +602,6 @@ void Cheats::KillAll(ETeam Team)
 					reinterpret_cast<APlayerCharacter*>(Actor)->Kill();
 					reinterpret_cast<APlayerCharacter*>(Actor)->Server_ReportToTOC(Actor, false, false);
 				}
-					
 			}
 		}
 	}
@@ -615,7 +611,7 @@ void Cheats::DrawReticle()
 {
 	if (!CVars.Reticle || !GVars.ReadyOrNotChar) return;
 
-	if (MiscSettings.ReticleWhenThrowing && !reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar)->bQuickThrowing) 
+	if (MiscSettings.ReticleWhenThrowing && !reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar)->bQuickThrowing)
 		return;
 
 	if (MiscSettings.CrossReticle)
@@ -645,9 +641,9 @@ void Cheats::GetAllEvidence()
 
 	for (AActor* Actor : ActorsCopy)
 	{
-		if (!Actor || !Utils::IsValidActor(Actor)) 
+		if (!Actor || !Utils::IsValidActor(Actor))
 			continue;
-		
+
 		if (Actor->IsA(ABaseWeapon::StaticClass()))
 		{
 			ABaseWeapon* Weapon = reinterpret_cast<ABaseWeapon*>(Actor);
@@ -739,12 +735,12 @@ void Cheats::RenderEnabledOptions()
 	Overlay::Text(10.0f, Y, Overlay::Color{ 255, 255, 255, 255 }, "Enabled Options:");
 	Y += 20.0f;
 	auto AddEnabled = [&Y, Color](bool Enabled, const std::string& Label)
-	{
-		if (!Enabled)
-			return;
-		Overlay::Text(10.0f, Y, Color, Label);
-		Y += 18.0f;
-	};
+		{
+			if (!Enabled)
+				return;
+			Overlay::Text(10.0f, Y, Color, Label);
+			Y += 18.0f;
+		};
 	AddEnabled(CVars.GodMode, "God Mode");
 	AddEnabled(CVars.InfAmmo, "Infinite Ammo");
 	AddEnabled(CVars.Aimbot, "Aimbot");
@@ -801,7 +797,7 @@ void Cheats::AutoWin()
 
 	for (AEvidenceActor* Evidence : GameState->AllEvidenceActors)
 	{
-		if (!Evidence) 
+		if (!Evidence)
 			continue;
 
 		if (Evidence->EvidenceComponent && Evidence->EvidenceComponent->CanBeCollected())
@@ -818,16 +814,16 @@ void Cheats::AutoWin()
 	}
 	for (AReportableActor* Actor : GameState->AllReportableActors)
 	{
-		GVars.ReadyOrNotChar->Server_ReportToTOC(Actor, false ,false);
+		GVars.ReadyOrNotChar->Server_ReportToTOC(Actor, false, false);
 		GVars.ReadyOrNotChar->Server_ReportTarget(Actor);
 		Actor->InteractableComponent->OnInteract(((APlayerCharacter*)GVars.ReadyOrNotChar));
 	}
 	for (AObjective* Objective : GameState->MissionObjectives)
 	{
-		if (!Objective) 
+		if (!Objective)
 			continue;
 
-		for (FScoreBonus &Bonus : Objective->ScoringComponent->ScoringData.Bonuses)
+		for (FScoreBonus& Bonus : Objective->ScoringComponent->ScoringData.Bonuses)
 		{
 			Bonus.bEnabled = true;
 			Bonus.bGiven = true;
@@ -885,7 +881,7 @@ void Cheats::ListPlayers()
 
 void Cheats::SurrenderAll(ETeam Team)
 {
-	if (!GVars.Level || !GVars.PlayerController || !GVars.HasAuthority) 
+	if (!GVars.Level || !GVars.PlayerController || !GVars.HasAuthority)
 		return; // Crashes if you aren't host because we use a replicate function.
 
 	ULevel* Level = GVars.Level;

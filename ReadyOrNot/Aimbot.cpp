@@ -43,7 +43,7 @@ void Cheats::Aimbot(bool DrawVisuals)
 	if (Now < NextAimUpdate)
 		return;
 	NextAimUpdate = Now + std::chrono::milliseconds(8);
-	
+
 	static std::string CachedBoneName;
 	static FName BoneName;
 	if (CachedBoneName != TextVars.AimbotBone)
@@ -116,7 +116,7 @@ void Cheats::Aimbot(bool DrawVisuals)
 
 	if (AimbotSettings.Prediction)
 	{
-		float ProjectileSpeed = 37000.0f; 
+		float ProjectileSpeed = 37000.0f;
 		if (GVars.ReadyOrNotChar->GetEquippedWeapon())
 		{
 			float WeaponProjectileSpeed = GVars.ReadyOrNotChar->GetEquippedWeapon()->ProjectileMovementSpeed;

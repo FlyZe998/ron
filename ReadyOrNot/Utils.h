@@ -130,11 +130,9 @@ struct Variables // horrible naming scheme holy shit
 	}
 
 	void AutoSetVariables() {
-
 		// Get PlayerController first
 		APlayerController* currentPC = Utils::GetPlayerController();
 		if (!currentPC) {
-
 			// Clear all dependent variables if PlayerController is null
 			this->PlayerController = nullptr;
 			this->POV = nullptr;
@@ -200,7 +198,7 @@ struct Variables // horrible naming scheme holy shit
 		}
 
 		// Update GameState
-		if (this->World && this->World->GameState && this->GameState != this->World->GameState && this->World->GameState->IsA(AReadyOrNotGameState::StaticClass())) 
+		if (this->World && this->World->GameState && this->GameState != this->World->GameState && this->World->GameState->IsA(AReadyOrNotGameState::StaticClass()))
 			this->GameState = static_cast<AReadyOrNotGameState*>(this->World->GameState);
 
 		if (this->PlayerController && this->PlayerController->PlayerCameraManager) {
@@ -209,7 +207,6 @@ struct Variables // horrible naming scheme holy shit
 		else {
 			this->POV = nullptr;
 		}
-
 	}
 
 	void Cleanup() {

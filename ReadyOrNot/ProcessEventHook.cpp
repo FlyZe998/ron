@@ -87,7 +87,7 @@ void hkPlayerProcessEvent(const SDK::UObject* Object, SDK::UFunction* Function, 
 			(GetAsyncKeyState(AimbotSettings.AimbotVirtualKey) & 0x8000) != 0;
 		if (CVars.TriggerBotHoldKey)
 			CVars.TriggerBot = TriggerBotVirtualKey != 0 &&
-				(GetAsyncKeyState(TriggerBotVirtualKey) & 0x8000) != 0;
+			(GetAsyncKeyState(TriggerBotVirtualKey) & 0x8000) != 0;
 		else if (TriggerBotVirtualKey && (GetAsyncKeyState(TriggerBotVirtualKey) & 1))
 			CVars.TriggerBot = !CVars.TriggerBot;
 		if (ESPKeyVK && (GetAsyncKeyState(ESPKeyVK) & 1))
@@ -227,120 +227,120 @@ void hkPlayerProcessEvent(const SDK::UObject* Object, SDK::UFunction* Function, 
 
 		switch (CVars.QueuedAction)
 		{
-			case EQueuedAction::GiveAchievements:
-			{
-				Cheats::GiveAchievements();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::ToggleGodMode:
-			{
-				Cheats::ToggleGodMode();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::ToggleInfAmmo:
-			{
-				Cheats::ToggleInfAmmo();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::RemoveRecoil:
-			{
-				Cheats::RemoveRecoil();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::RemoveSpread:
-			{
-				Cheats::RemoveSpread();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::AddAutoFire:
-			{
-				Cheats::AddAutoFire();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::AddPenetration:
-			{
-				Cheats::PenetrateWalls();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::AddMagazine:
-			{
-				Cheats::AddMag();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::SetFireRate:
-			{
-				Cheats::SetFireRate(3000.0f);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::InstaKill:
-			{
-				Cheats::InstaKill();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::KillAllSuspects:
-			{
-				Cheats::KillAll(ETeam::TEAM_SUSPECT);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			}
-			case EQueuedAction::SurrenderAllSuspects:
-				Cheats::SurrenderAll(ETeam::TEAM_SUSPECT);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::ArrestAllSuspects:
-				Cheats::ArrestAll(ETeam::TEAM_SUSPECT);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::KillAllCivilians:
-				Cheats::KillAll(ETeam::TEAM_CIVILIAN);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::SurrenderAllCivilians:
-				Cheats::SurrenderAll(ETeam::TEAM_CIVILIAN);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::ArrestAllCivilians:
-				Cheats::ArrestAll(ETeam::TEAM_CIVILIAN);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::CollectAllEvidence:
-				Cheats::GetAllEvidence();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::AutoWin:
-				Cheats::AutoWin();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::UnlockAllDoors:
-				Cheats::UnlockDoors();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::PrintActors:
-				Utils::PrintActors(nullptr);
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::ChangeFOV:
-				Cheats::ChangeFOV();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::SaveConfiguration:
-				SaveSettings();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
-			case EQueuedAction::LoadConfiguration:
-				LoadSettings();
-				CVars.QueuedAction = EQueuedAction::None;
-				break;
+		case EQueuedAction::GiveAchievements:
+		{
+			Cheats::GiveAchievements();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::ToggleGodMode:
+		{
+			Cheats::ToggleGodMode();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::ToggleInfAmmo:
+		{
+			Cheats::ToggleInfAmmo();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::RemoveRecoil:
+		{
+			Cheats::RemoveRecoil();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::RemoveSpread:
+		{
+			Cheats::RemoveSpread();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::AddAutoFire:
+		{
+			Cheats::AddAutoFire();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::AddPenetration:
+		{
+			Cheats::PenetrateWalls();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::AddMagazine:
+		{
+			Cheats::AddMag();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::SetFireRate:
+		{
+			Cheats::SetFireRate(3000.0f);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::InstaKill:
+		{
+			Cheats::InstaKill();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::KillAllSuspects:
+		{
+			Cheats::KillAll(ETeam::TEAM_SUSPECT);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		}
+		case EQueuedAction::SurrenderAllSuspects:
+			Cheats::SurrenderAll(ETeam::TEAM_SUSPECT);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::ArrestAllSuspects:
+			Cheats::ArrestAll(ETeam::TEAM_SUSPECT);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::KillAllCivilians:
+			Cheats::KillAll(ETeam::TEAM_CIVILIAN);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::SurrenderAllCivilians:
+			Cheats::SurrenderAll(ETeam::TEAM_CIVILIAN);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::ArrestAllCivilians:
+			Cheats::ArrestAll(ETeam::TEAM_CIVILIAN);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::CollectAllEvidence:
+			Cheats::GetAllEvidence();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::AutoWin:
+			Cheats::AutoWin();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::UnlockAllDoors:
+			Cheats::UnlockDoors();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::PrintActors:
+			Utils::PrintActors(nullptr);
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::ChangeFOV:
+			Cheats::ChangeFOV();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::SaveConfiguration:
+			SaveSettings();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
+		case EQueuedAction::LoadConfiguration:
+			LoadSettings();
+			CVars.QueuedAction = EQueuedAction::None;
+			break;
 		}
 
 		if (CVars.TriggerBot)
@@ -490,12 +490,11 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 							FireParams->SpawnLoc = SpawnLoc;
 							FireParams->Direction = UKismetMathLibrary::Conv_VectorToRotator(Direction);
 						}
-
 					}
 
 					if (CVars.SilentAim && OwnerIsLocalPlayer)
 						Cheats::SilentAim(FireParams);
-					
+
 					if (!JustFired)
 					{
 						JustFired = true;

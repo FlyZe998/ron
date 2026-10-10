@@ -296,11 +296,11 @@ HRESULT __stdcall Engine::hkPresent(IDXGISwapChain* SwapChain, UINT SyncInterval
 	} PresentGuard;
 	std::unique_lock<std::recursive_mutex> Lock(RenderMutex, std::try_to_lock);
 	auto ForwardPresent = [&]() -> HRESULT
-	{
-		if (Lock.owns_lock())
-			Lock.unlock();
-		return Engine::oPresent(SwapChain, SyncInterval, Flags);
-	};
+		{
+			if (Lock.owns_lock())
+				Lock.unlock();
+			return Engine::oPresent(SwapChain, SyncInterval, Flags);
+		};
 	if (!Lock.owns_lock() || Cleaning.load() || (Flags & DXGI_PRESENT_TEST))
 		return ForwardPresent();
 
@@ -328,7 +328,6 @@ HRESULT __stdcall Engine::hkPresent(IDXGISwapChain* SwapChain, UINT SyncInterval
 		OverlayRenderFailureLogged = true;
 	}
 	return ForwardPresent();
-
 }
 
 static DWORD WINAPI MainThread(LPVOID Parameter)
@@ -436,7 +435,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
 		Cleaning.store(true);
 		break;
 	}
-	
+
 	return TRUE;
 }
 
@@ -553,7 +552,6 @@ void SaveSettings()
 			printf("[ERROR] Could not open CVars.bin for writing!\n");
 	}
 }
-
 
 void LoadSettings()
 {

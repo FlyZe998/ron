@@ -122,17 +122,17 @@ namespace
 
 	namespace HudStyle
 	{
-		constexpr bool CornerBrackets = true;      
-		constexpr float BracketRatio = 0.28f;      
+		constexpr bool CornerBrackets = true;
+		constexpr float BracketRatio = 0.28f;
 		constexpr float BracketMinLength = 5.0f;
 		constexpr float BracketMaxLength = 26.0f;
-		constexpr int BoxFillAlpha = 12;           
-		constexpr bool Glow = true;                
-		constexpr size_t GlowCommandLimit = 450;   
+		constexpr int BoxFillAlpha = 12;
+		constexpr bool Glow = true;
+		constexpr size_t GlowCommandLimit = 450;
 		constexpr int GlowAlphaPercent = 30;
 		constexpr float GlowExtraWidth = 3.0f;
-		constexpr float TextPaddingX = 5.0f;       
-		constexpr float TextCut = 4.0f;            
+		constexpr float TextPaddingX = 5.0f;
+		constexpr float TextCut = 4.0f;
 		constexpr float FontSize = 14.0f;
 	}
 

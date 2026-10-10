@@ -64,7 +64,6 @@ struct EspSettingsstruct {
 	Overlay::FloatColor TeamColor{ 0.0f, 1.0f, 0.0f, BoneOpacity };
 	Overlay::FloatColor ArrestColor{ 1.0f, 1.0f, 0.0f, BoneOpacity };
 	bool LOS = false;
-
 } inline ESPSettings;
 
 struct AimbotSettingsstruct {

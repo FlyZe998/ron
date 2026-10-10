@@ -452,10 +452,10 @@ namespace
 			return;
 
 		const auto Fill = [&](int Left, int Top, int Right, int Bottom, COLORREF Color)
-		{
-			const RECT Area{ Left, Top, Right, Bottom };
-			FillSolid(DeviceContext, Area, Color);
-		};
+			{
+				const RECT Area{ Left, Top, Right, Bottom };
+				FillSolid(DeviceContext, Area, Color);
+			};
 		const int Inset = 3;
 		const int Arm = 18;
 
@@ -753,8 +753,8 @@ namespace
 		const wchar_t* Status = !GVars.PlayerController
 			? L"ROLE: WAITING FOR SESSION"
 			: GVars.HasAuthority
-				? L"ROLE: HOST / AUTHORITY"
-				: L"ROLE: CLIENT";
+			? L"ROLE: HOST / AUTHORITY"
+			: L"ROLE: CLIENT";
 		SetWindowTextW(SessionLabel, Status);
 	}
 
@@ -814,17 +814,17 @@ namespace
 	{
 		PageControls.clear();
 		EnumChildWindows(PageContainer, [](HWND Child, LPARAM) -> BOOL
-		{
-			if (GetParent(Child) != PageContainer)
+			{
+				if (GetParent(Child) != PageContainer)
+					return TRUE;
+				RECT Bounds{};
+				GetWindowRect(Child, &Bounds);
+				MapWindowPoints(nullptr, PageContainer, reinterpret_cast<POINT*>(&Bounds), 2);
+				PageControls.push_back({ Child, Bounds });
+				if (!SetWindowSubclass(Child, PageControlProc, PageWheelSubclassId, 0))
+					OutputDebugStringA("[Settings] Failed to enable page scrolling for a menu control.\n");
 				return TRUE;
-			RECT Bounds{};
-			GetWindowRect(Child, &Bounds);
-			MapWindowPoints(nullptr, PageContainer, reinterpret_cast<POINT*>(&Bounds), 2);
-			PageControls.push_back({ Child, Bounds });
-			if (!SetWindowSubclass(Child, PageControlProc, PageWheelSubclassId, 0))
-				OutputDebugStringA("[Settings] Failed to enable page scrolling for a menu control.\n");
-			return TRUE;
-		}, 0);
+			}, 0);
 	}
 
 	LRESULT CALLBACK PageControlProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam,
