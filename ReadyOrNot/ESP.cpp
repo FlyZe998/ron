@@ -288,36 +288,28 @@ void Cheats::RenderESP()
             }
         }
 
-		std::array<FVector2D, 120> BoneScreenPositions{};
-		std::array<bool, 120> BoneScreenPositionReady{};
-		const FTransform ComponentToWorld = DrawSkeleton
-			? Mesh->K2_GetComponentToWorld()
-			: FTransform{};
-		auto GetBoneScreenPosition = [&](int BoneIndex, FVector2D& ScreenPosition)
-		{
-			if (BoneIndex < 0 || BoneIndex >= static_cast<int>(BoneScreenPositions.size()))
-				return false;
-			const size_t Index = static_cast<size_t>(BoneIndex);
-			if (!BoneScreenPositionReady[Index])
-			{
-				BoneScreenPositionReady[Index] = true;
-				if (Mesh->CachedComponentSpaceTransforms.IsValid() &&
-					Index < static_cast<size_t>(Mesh->CachedComponentSpaceTransforms.Num()))
-				{
-					const FVector BoneWorldPosition = TransformComponentPoint(
-						Mesh->CachedComponentSpaceTransforms[static_cast<int>(Index)].Translation,
-						ComponentToWorld);
-					FVector2D Projected{};
-					if (Utils::SafeProjectWorldLocationToScreen(
-						GVars.PlayerController, BoneWorldPosition, &Projected, true))
-					{
-						BoneScreenPositions[Index] = Projected;
-					}
-				}
-			}
-			ScreenPosition = BoneScreenPositions[Index];
-			return ScreenPosition.X != 0.0 || ScreenPosition.Y != 0.0;
-		};
+        auto GetBoneScreenPosition = [&](int BoneIndex, FVector2D& ScreenPosition)
+        {
+            if (BoneIndex < 0 || BoneIndex > 5000)
+            {
+                return false;
+            }
+
+            const FName BoneName = Mesh->GetBoneName(BoneIndex);
+            const FTransform BoneTransform = Mesh->GetBoneTransform(BoneName, ERelativeTransformSpace::RTS_World);
+            if (BoneTransform.Translation.IsZero())
+            {
+                return false;
+            }
+
+            const FVector BoneLocation = BoneTransform.Translation;
+            if (!Utils::SafeProjectWorldLocationToScreen(GVars.PlayerController, BoneLocation, &ScreenPosition, true))
+            {
+                return true;
+            }
+
+            return true;
+        };
 		bool HasBoxBounds = false;
 		FVector2D TopLeft{};
 		FVector2D BottomRight{};
