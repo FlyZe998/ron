@@ -1,0 +1,204 @@
+#pragma once
+
+#include "Engine.h"
+#include "Utils.h"
+
+inline bool AimbotKeyDown = false;
+inline int TriggerBotVirtualKey = 0;
+inline int ESPKeyVK = 0;
+
+struct BoneListStruct
+{
+	std::string HeadBone = "Head";
+	std::string NeckBone = "neck_1";
+	std::string ChestBone = "spine_2";
+	std::string StomachBone = "spine_1";
+	std::string PelvisBone = "pelvis";
+	std::string LeftShoulderBone = "clavicle_LE";
+	std::string LeftElbowBone = "lowerarm_LE";
+	std::string LeftHandBone = "hand_LE";
+	std::string RightShoulderBone = "clavicle_RI";
+	std::string RightElbowBone = "lowerarm_RI";
+	std::string RightHandBone = "hand_RI";
+} inline BoneList;
+
+enum EQueuedAction
+{
+	None,
+	GiveAchievements,
+	ToggleGodMode,
+	ToggleInfAmmo,
+	RemoveRecoil,
+	RemoveSpread,
+	AddAutoFire,
+	AddPenetration,
+	AddMagazine,
+	SetFireRate,
+	InstaKill,
+	KillAllSuspects,
+	SurrenderAllSuspects,
+	ArrestAllSuspects,
+	KillAllCivilians,
+	SurrenderAllCivilians,
+	ArrestAllCivilians,
+	CollectAllEvidence,
+	AutoWin,
+	UnlockAllDoors,
+	PrintActors,
+	ChangeFOV,
+	SaveConfiguration,
+	LoadConfiguration,
+};
+
+struct EspSettingsstruct {
+	bool ShowTeam = true;
+	bool ShowBox = false;
+	bool ShowTraps = true;
+	bool ShowObjectives = false;
+	bool ShowEnemyDistance = false;
+	bool Bones = true;
+	float BoneOpacity = 1.0f;
+	Overlay::FloatColor SuspectColor{ 1.0f, 0.0f, 0.0f, BoneOpacity };
+	Overlay::FloatColor CivilianColor{ 0.0f, 0.0f, 1.0f, BoneOpacity };
+	Overlay::FloatColor DeadColor{ 0.0f, 0.0f, 0.0f, BoneOpacity };
+	Overlay::FloatColor TeamColor{ 0.0f, 1.0f, 0.0f, BoneOpacity };
+	Overlay::FloatColor ArrestColor{ 1.0f, 1.0f, 0.0f, BoneOpacity };
+	bool LOS = false;
+
+} inline ESPSettings;
+
+struct AimbotSettingsstruct {
+	float MaxFOV = 15.0f;
+	float MaxDistance = 100.0f;
+	bool LOS = true;
+	bool TargetCivilians = false;
+	bool TargetDead = false;
+	bool TargetArrested = false;
+	float MinDistance = 2.0f;
+	bool Smooth = false;
+	float SmoothingVector = 5.0f;
+	bool DrawArrow = false;
+	bool DrawFOV = false;
+	bool RequireKeyHeld = true;
+	int LegacyAimbotKey = 0;
+	float FOVThickness = 1.0f;
+	float ArrowThickness = 2.0f;
+	bool TargetAll = false;
+	bool Prediction = false;
+	float PredictionMultiplier = 1.0f;
+	bool TargetLock = true;
+	bool TargetSurrendered = false;
+	int AimbotVirtualKey = VK_RBUTTON;
+} inline AimbotSettings;
+
+struct SilentAimSettingsstruct {
+	float HitChance = 100.0f;
+	float MaxFOV = 15.0f;
+	bool TargetCivilians = false;
+	bool TargetDead = false;
+	bool TargetSurrendered = false;
+	bool TargetArrested = false;
+	bool RequiresLOS = false;
+	bool DrawFOV = false;
+	bool DrawArrow = false;
+	float ArrowThickness = 2.0f;
+	float FOVThickness = 1.0f;
+	bool TargetAll = false;
+} inline SilentAimSettings;
+
+struct CVarsStruct
+{
+	float Speed = 1;
+	float FOV = 120.0f;
+	float BulletTimeSpeed = 0.3f;
+	bool Debug = false;
+	bool SecretFeatures = false;
+	bool GodMode = false;
+	bool InfAmmo = false;
+	bool Aimbot = false;
+	bool ESP = false;
+	bool SpeedEnabled = false;
+	bool SilentAim = false;
+	bool Reticle = false;
+	bool TriggerBot = false;
+	bool RenderOptions = false;
+	bool ListPlayers = false;
+	bool ShootFromReticle = false;
+	bool SaveDebugToFile = false;
+	bool BulletTime = false;
+	bool AntiSway = false;
+	bool InstantMultiTool = false;
+	int MultiFire = 0;
+	std::atomic<EQueuedAction> QueuedAction{ EQueuedAction::None };
+	bool KeepNoRecoil = false;
+	bool KeepNoSpread = false;
+	bool KeepAutoFire = false;
+	bool KeepPenetration = false;
+	bool KeepInstaKill = false;
+	bool KeepHighFireRate = false;
+	bool TriggerBotHoldKey = false;
+} inline CVars;
+
+struct MiscSettingsStruct {
+	bool Reticle = false;
+	Overlay::FloatColor ReticleColor{ 0.0f, 1.0f, 0.0f, 1.0f };
+	float ReticleSize = 5.0f;
+	Overlay::Point ReticlePosition{ 0.0f, 0.0f };
+	bool ReticleWhenThrowing = false;
+	bool TriggerBotTargetsCivilians = false;
+	bool TriggerBotUsesSilentAim = false;
+	bool CrossReticle = true;
+	bool ShouldAutoSave = true;
+	bool ShouldSaveCVars = true;
+	int UninjectButton = VK_END;
+	int MenuButton = VK_INSERT;
+	bool StreamProof = true;
+} inline MiscSettings;
+
+struct Settingsstruct
+{
+	bool ShouldSave = true;
+	bool ShouldLoad = true;
+} inline Settings;
+
+struct TextVarsstruct
+{
+	std::string SilentAimBone = BoneList.HeadBone;
+	std::string AimbotBone = BoneList.HeadBone;
+	std::string DebugFunctionNameMustInclude = "";
+	std::string DebugFunctionObjectMustInclude = "";
+} inline TextVars;
+
+struct Cheats
+{
+	static void ToggleGodMode();
+	static void ToggleInfAmmo();
+	static void Aimbot(bool DrawVisuals = true);
+	static void AddAutoFire();
+	static void RemoveRecoil();
+	static void RemoveSpread();
+	static void SetFireRate(float FireRate);
+	static void PenetrateWalls();
+	static void InstaKill();
+	static void RenderESP();
+	static void SetPlayerSpeed();
+	static void ApplyPersistentWeaponSettings();
+	static void SilentAim(Params::BaseMagazineWeapon_Server_OnFire* FireParams);
+	static void AddMag();
+	static void ArrestAll(ETeam Team); // Arrest all of a specific team
+	static void ProcessArrestQueue();
+	static void KillAll(ETeam Team);   // Kill all of a specific team
+	static void DrawReticle();
+	static void GetAllEvidence();
+	static void TriggerBot();
+	static void RenderEnabledOptions();
+	static void ChangeFOV();
+	static void UnlockDoors();
+	static void AutoWin();
+	static void ListPlayers();
+	static void ChangeGameRenderSettings();
+	static void GoTo(FVector Location);
+	static void SurrenderAll(ETeam Team); // Surrender all of a specific team
+	static void AntiSway();
+	static void GiveAchievements();
+};
