@@ -6,6 +6,7 @@
 #include <dwmapi.h>
 #include <uxtheme.h>
 #include <algorithm>
+#include <cmath>
 
 #pragma comment(lib, "Comctl32.lib")
 #pragma comment(lib, "Comdlg32.lib")
@@ -86,6 +87,7 @@ namespace
 	HBRUSH MenuPanelBrush = nullptr;
 	HWND HeaderLabel = nullptr;
 	HWND SessionLabel = nullptr;
+	HWND CreditLabel = nullptr;
 	DWORD MenuThreadId = 0;
 	std::unordered_map<int, Binding> Bindings;
 	std::unordered_map<int, Action> Actions;
@@ -925,10 +927,13 @@ namespace
 			StyleControl(TabControl);
 			SendMessageW(TabControl, TCM_SETITEMSIZE, 0, MAKELPARAM(77, 32));
 			HeaderLabel = CreateWindowExW(0, L"STATIC",
-				L"CONTROL CENTER  /  HOVER AN OPTION FOR DETAILS",
-				WS_CHILD | WS_VISIBLE, 18, 51, 420, 22, Window, nullptr, ModuleInstance, nullptr);
+				L"CONTROL CENTER",
+				WS_CHILD | WS_VISIBLE, 18, 51, 220, 22, Window, nullptr, ModuleInstance, nullptr);
 			if (HeaderFont)
 				SendMessageW(HeaderLabel, WM_SETFONT, reinterpret_cast<WPARAM>(HeaderFont), TRUE);
+			CreditLabel = CreateWindowExW(0, L"STATIC", L"FlyZe998",
+				WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 240, 51, 200, 22,
+				Window, nullptr, ModuleInstance, nullptr);
 			SessionLabel = CreateWindowExW(0, L"STATIC", L"ROLE: WAITING FOR SESSION",
 				WS_CHILD | WS_VISIBLE | SS_RIGHT, 445, 51, Client.right - 463, 22,
 				Window, nullptr, ModuleInstance, nullptr);
@@ -936,7 +941,7 @@ namespace
 			PageContainer = CreateWindowExW(0, PageWindowClassName, L"",
 				WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
 				10, 78, Client.right - 20, Client.bottom - 88, Window, nullptr, ModuleInstance, nullptr);
-			if (!TabControl || !HeaderLabel || !SessionLabel || !PageContainer)
+			if (!TabControl || !HeaderLabel || !CreditLabel || !SessionLabel || !PageContainer)
 				return -1;
 			SetWindowTheme(PageContainer, L"DarkMode_Explorer", nullptr);
 			const wchar_t* Tabs[] = { L"Player", L"Weapon", L"World", L"Aimbot", L"ESP", L"Silent Aim", L"Misc", L"Debug", L"Players" };
@@ -974,10 +979,38 @@ namespace
 				DrawOwnerButton(*DrawItem);
 				return TRUE;
 			}
+			if (DrawItem->CtlType == ODT_STATIC && DrawItem->hwndItem == CreditLabel)
+			{
+				SetBkMode(DrawItem->hDC, TRANSPARENT);
+				HFONT Font = HeaderFont ? HeaderFont : MenuFont;
+				HGDIOBJ PreviousFont = Font ? SelectObject(DrawItem->hDC, Font) : nullptr;
+				const wchar_t* Credit = L"FlyZe998";
+				const size_t Length = wcslen(Credit);
+				int X = DrawItem->rcItem.left + 2;
+				const int Y = DrawItem->rcItem.top;
+				for (size_t Index = 0; Index < Length; ++Index)
+				{
+					const double Phase = static_cast<double>(Index) * 0.48;
+					const BYTE R = static_cast<BYTE>(127.5 * (std::sin(Phase) + 1.0));
+					const BYTE G = static_cast<BYTE>(127.5 * (std::sin(Phase + 2.094) + 1.0));
+					const BYTE B = static_cast<BYTE>(127.5 * (std::sin(Phase + 4.188) + 1.0));
+					SetTextColor(DrawItem->hDC, RGB(R, G, B));
+					wchar_t Character[2]{ Credit[Index], L'\0' };
+					TextOutW(DrawItem->hDC, X, Y + 2, Character, 1);
+					SIZE Extent{};
+					GetTextExtentPoint32W(DrawItem->hDC, Character, 1, &Extent);
+					X += Extent.cx;
+				}
+				if (PreviousFont)
+					SelectObject(DrawItem->hDC, PreviousFont);
+				return TRUE;
+			}
 			break;
 		}
 		case WM_TIMER:
 			UpdateSessionStatus();
+			if (CreditLabel)
+				InvalidateRect(CreditLabel, nullptr, TRUE);
 			if (WParam == 1 && CurrentPage == 8)
 				CreatePage(CurrentPage, false);
 			return 0;
@@ -988,7 +1021,9 @@ namespace
 			if (TabControl)
 				MoveWindow(TabControl, 10, 10, (std::max)(0, Width - 20), 34, TRUE);
 			if (HeaderLabel)
-				MoveWindow(HeaderLabel, 18, 51, (std::max)(0, Width - 315), 22, TRUE);
+				MoveWindow(HeaderLabel, 18, 51, 215, 22, TRUE);
+			if (CreditLabel)
+				MoveWindow(CreditLabel, 238, 51, 202, 22, TRUE);
 			if (SessionLabel)
 			{
 				const int SessionLeft = (std::max)(18, Width - 285);
@@ -1282,6 +1317,7 @@ namespace
 		TabControl = nullptr;
 		HeaderLabel = nullptr;
 		SessionLabel = nullptr;
+		CreditLabel = nullptr;
 		if (ToolTipWindow)
 		{
 			DestroyWindow(ToolTipWindow);
