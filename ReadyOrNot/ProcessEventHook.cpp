@@ -463,12 +463,14 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 			reinterpret_cast<Params::CanUseMultitoolOn_GetMultitoolUseTime*>(Params)->ReturnValue = 0.01f;
 			return;
 		}
-		else if ((CVars.SilentAim || CVars.ShootFromReticle))
+		else if ((CVars.SilentAim || CVars.ShootFromReticle || CVars.KeepNoSpread))
 		{
-			if (Params && Object->IsA(ABaseMagazineWeapon::StaticClass()) && strcmp(Function->GetName().c_str(), "Server_OnFire") == 0)
+			if (Params && Object->IsA(ABaseMagazineWeapon::StaticClass()) &&
+				strcmp(Function->GetName().c_str(), "Server_OnFire") == 0)
 			{
-				auto* Weapon = const_cast<ABaseMagazineWeapon*>(reinterpret_cast<const ABaseMagazineWeapon*>(Object));
-				bool OwnerIsLocalPlayer = GVars.ReadyOrNotChar && GVars.PlayerController &&
+				auto* Weapon = const_cast<ABaseMagazineWeapon*>(
+					reinterpret_cast<const ABaseMagazineWeapon*>(Object));
+				const bool OwnerIsLocalPlayer = GVars.ReadyOrNotChar && GVars.PlayerController &&
 					Weapon->Owner == GVars.ReadyOrNotChar;
 
 				if (OwnerIsLocalPlayer)
@@ -476,7 +478,7 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 					auto* FireParams =
 						reinterpret_cast<Params::BaseMagazineWeapon_Server_OnFire*>(Params);
 
-					if (CVars.ShootFromReticle && OwnerIsLocalPlayer)
+					if (CVars.ShootFromReticle)
 					{
 						FVector SpawnLoc{};
 						FVector Direction{};
@@ -484,24 +486,24 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 							GVars.ScreenSize.x / 2.0f + MiscSettings.ReticlePosition.x,
 							GVars.ScreenSize.y / 2.0f + MiscSettings.ReticlePosition.y,
 							&SpawnLoc,
-							&Direction
-						))
+							&Direction))
 						{
 							FireParams->SpawnLoc = SpawnLoc;
 							FireParams->Direction = UKismetMathLibrary::Conv_VectorToRotator(Direction);
 						}
 					}
 
-					if (CVars.SilentAim && OwnerIsLocalPlayer)
+					if (CVars.KeepNoSpread || CVars.ShootFromReticle)
+						FireParams->Seed = 0;  // kill random cone on the server
+
+					if (CVars.SilentAim)
 						Cheats::SilentAim(FireParams);
 
 					if (!JustFired)
 					{
 						JustFired = true;
 						for (int i = 0; i < CVars.MultiFire; i++)
-						{
 							Weapon->Server_OnFire(FireParams->Direction, FireParams->SpawnLoc, FireParams->Seed);
-						}
 						JustFired = false;
 					}
 				}

@@ -229,65 +229,25 @@ void Cheats::RemoveSpread()
 	Gun->VelocityRecoilMultiplier = 0.0f;
 }
 
-void Cheats::RemoveRecoil()
+void Cheats::RemoveSpread()
 {
 	if (!GVars.ReadyOrNotChar)
-	{
-		Utils::Error("Character Invalid: RemoveRecoil ; Misc.cpp");
 		return;
-	}
-	if (!GVars.ReadyOrNotChar->GetEquippedWeapon())
-	{
-		Utils::Error("Weapon Invalid: RemoveRecoil ; Misc.cpp");
-		return;
-	}
 
-	APlayerCharacter* Character = reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar);
 	ABaseMagazineWeapon* Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
+	if (!Gun || !Utils::IsValidActor(Gun))
+		return;
 
-	Gun->RecoilMultiplierPitch = 0.0f;
-	Gun->RecoilMultiplierYaw = 0.0f;
-	Gun->FirstShotRecoil = 0.0f;
-	Gun->RecoilFireStrength = 0.0f;
-	Gun->RecoilFireStrengthFirst = 0.0f;
-	Gun->RecoilAngleStrength = 0.0f;
-	Gun->RecoilRandomness = 0.0f;
-	Gun->RecoilFireADSModifier = 0.0f;
-	Gun->RecoilAngleADSModifier = 0.0f;
-	Gun->RecoilBuildupADSModifier = 0.0f;
-	Gun->RecoilHasBuildup = false;
-	Gun->RecoilBuildupDampStrength = 0.0f;
-	Gun->Wobble = 0.0f;
-	Gun->FirstShotRecoil = 0.0f;
+	Gun->SpreadPattern = FRotator();
+	Gun->SpreadReturnRate = 0.0f;
+	Gun->FirstShotSpread = 0.0f;
 	Gun->FirstShotResetTime = 0.0f;
-	Gun->RecoilPattern = TArray<FRotator>();
-	Gun->RecoilPositionBuildup = FVector();
-	Gun->RecoilRotationBuildup = FRotator();
+	Gun->VelocitySpreadMultiplier = 0.0f;
+	Gun->ADSSpreadMultiplier = 0.0f;
+	Gun->bIgnoreAmmoTypeSpread = true;
 	Gun->VelocityRecoilMultiplier = 0.0f;
-	Gun->ADSRecoilMultiplier = 0.0f;
-	Gun->FireCameraShake = nullptr;
-	Gun->FireCameraShakeInst = nullptr;
-	Gun->Reload_CameraShake = nullptr;
-	Gun->ReloadEmpty_CameraShake = nullptr;
-	Gun->ProcRecoil_Trans = FVector();
-	Gun->ProcRecoil_Rot = FRotator();
-	Gun->ProcRecoil_Trans_Buildup = FVector();
-	Gun->ProcRecoil_Rot_Buildup = FRotator();
-	Gun->bCalculateProcRecoil = false;
-	Gun->CurrentHighTimer = 0.0f;
-	Gun->FireHighTimer = 0.0f;
-	Gun->RecoilFireTime = 0.0f;
-	Gun->RecoilReturnRate = 0.0f;
-	Gun->RecoilReturnInterpSpeed = 0.0f;
-	Gun->RecoilReturnPercentage = 0.0f;
-	Gun->RecoilDampStrength = 0.0f;
-	Character->WeaponBobRot = FRotator();
-	Character->WeaponBobTrans = FVector();
-	Gun->bUseFireLoopAnims = false;
-	Character->CameraBobRot = FRotator();
-	Character->CameraBobTrans = FVector();
-	Character->MeshspaceRecoilMovementMultiplier = FVector();
-	Character->RecoilSpeed = 0.0f;
+
+	Gun->PendingSpread = FRotator();
 }
 
 void Cheats::SetPlayerSpeed()
