@@ -42,7 +42,7 @@ void Cheats::Aimbot(bool DrawVisuals)
 	static auto NextAimUpdate = std::chrono::steady_clock::time_point{};
 	if (Now < NextAimUpdate)
 		return;
-	NextAimUpdate = Now + std::chrono::milliseconds(4);
+	NextAimUpdate = Now + std::chrono::milliseconds(8);
 
 	static std::string CachedBoneName;
 	static FName BoneName;
@@ -95,7 +95,7 @@ void Cheats::Aimbot(bool DrawVisuals)
 			AimbotSettings.MinDistance,
 			AimbotSettings.MaxDistance
 		);
-		NextTargetSearch = Now + std::chrono::milliseconds(30);
+		NextTargetSearch = Now + std::chrono::milliseconds(20);
 	}
 
 	AActor* Target = LastTarget;
