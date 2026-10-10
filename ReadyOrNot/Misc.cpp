@@ -114,7 +114,7 @@ void Cheats::ToggleInfAmmo()
 		Gun->ReplenishAmmo();
 
 		
-		if (Gun->GetAmmo() < 3.0f)
+		if (Gun->GetAmmo() < 1.0f)
 		{
 			FMagazine NewMag;
 			NewMag.Ammo = Gun->MagazineCountDefault;

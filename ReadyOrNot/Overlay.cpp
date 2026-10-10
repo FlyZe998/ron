@@ -2,8 +2,11 @@
 #include "Overlay.h"
 
 #include <gdiplus.h>
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -45,7 +48,7 @@ namespace
 	std::atomic<bool> OverlayVisible{ false };
 	std::atomic<bool> RenderRequestPending{ false };
 	std::atomic<int64_t> LastRenderRequestNanoseconds{ 0 };
-	constexpr int64_t MinimumRenderIntervalNanoseconds = 33'333'333;
+	constexpr int64_t MinimumRenderIntervalNanoseconds = 20'200'200;
 	const wchar_t* OverlayClassName = L"ReadyOrNotIndependentOverlay";
 	constexpr UINT WM_OVERLAY_RENDER = WM_APP + 1;
 	constexpr UINT WM_OVERLAY_HIDE = WM_APP + 2;
@@ -116,6 +119,101 @@ namespace
 	};
 
 	OverlaySurface RenderSurface;
+
+	namespace HudStyle
+	{
+		constexpr bool CornerBrackets = true;      
+		constexpr float BracketRatio = 0.28f;      
+		constexpr float BracketMinLength = 5.0f;
+		constexpr float BracketMaxLength = 26.0f;
+		constexpr int BoxFillAlpha = 12;           
+		constexpr bool Glow = true;                
+		constexpr size_t GlowCommandLimit = 450;   
+		constexpr int GlowAlphaPercent = 30;
+		constexpr float GlowExtraWidth = 3.0f;
+		constexpr float TextPaddingX = 5.0f;       
+		constexpr float TextCut = 4.0f;            
+		constexpr float FontSize = 14.0f;
+	}
+
+	struct HudFonts
+	{
+		std::unique_ptr<Gdiplus::Font> Text;
+		std::unique_ptr<Gdiplus::StringFormat> Format;
+
+		void Ensure()
+		{
+			if (Text && Format)
+				return;
+
+			Text.reset();
+			const wchar_t* Candidates[] = { L"Bahnschrift", L"Segoe UI" };
+			for (const wchar_t* Name : Candidates)
+			{
+				Gdiplus::FontFamily Family(Name);
+				if (!Family.IsAvailable())
+					continue;
+				const INT Style = Family.IsStyleAvailable(Gdiplus::FontStyleBold)
+					? Gdiplus::FontStyleBold
+					: Gdiplus::FontStyleRegular;
+				auto Candidate = std::make_unique<Gdiplus::Font>(&Family, HudStyle::FontSize, Style, Gdiplus::UnitPixel);
+				if (Candidate->IsAvailable())
+				{
+					Text = std::move(Candidate);
+					break;
+				}
+			}
+			if (!Text)
+				Text = std::make_unique<Gdiplus::Font>(L"Segoe UI", HudStyle::FontSize, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
+
+			Format = std::make_unique<Gdiplus::StringFormat>();
+			Format->SetAlignment(Gdiplus::StringAlignmentNear);
+			Format->SetLineAlignment(Gdiplus::StringAlignmentNear);
+			Format->SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap | Gdiplus::StringFormatFlagsNoClip);
+		}
+
+		void Release()
+		{
+			Text.reset();
+			Format.reset();
+		}
+	};
+
+	HudFonts HudFontCache;
+
+	BYTE ScaleAlpha(BYTE Alpha, int Percent)
+	{
+		return static_cast<BYTE>((static_cast<int>(Alpha) * Percent) / 100);
+	}
+
+	void AddChamferedPolygon(Gdiplus::GraphicsPath& Path, float Left, float Top, float Right, float Bottom, float Cut)
+	{
+		const Gdiplus::PointF Points[6] = {
+			Gdiplus::PointF(Left + Cut, Top),
+			Gdiplus::PointF(Right, Top),
+			Gdiplus::PointF(Right, Bottom - Cut),
+			Gdiplus::PointF(Right - Cut, Bottom),
+			Gdiplus::PointF(Left, Bottom),
+			Gdiplus::PointF(Left, Top + Cut)
+		};
+		Path.AddPolygon(Points, 6);
+	}
+
+	void AddCornerBrackets(Gdiplus::GraphicsPath& Path, float Left, float Top, float Right, float Bottom, float Length)
+	{
+		Path.StartFigure();
+		Path.AddLine(Left, Top + Length, Left, Top);
+		Path.AddLine(Left, Top, Left + Length, Top);
+		Path.StartFigure();
+		Path.AddLine(Right - Length, Top, Right, Top);
+		Path.AddLine(Right, Top, Right, Top + Length);
+		Path.StartFigure();
+		Path.AddLine(Right, Bottom - Length, Right, Bottom);
+		Path.AddLine(Right, Bottom, Right - Length, Bottom);
+		Path.StartFigure();
+		Path.AddLine(Left + Length, Bottom, Left, Bottom);
+		Path.AddLine(Left, Bottom, Left, Bottom - Length);
+	}
 
 	LRESULT CALLBACK OverlayWindowProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 	{
@@ -229,6 +327,7 @@ namespace
 		OverlayVisible.store(false);
 		OverlayWindow.store(nullptr);
 		DestroyWindow(Window);
+		HudFontCache.Release();
 		RenderSurface.Reset();
 		UnregisterClassW(OverlayClassName, OverlayInstance);
 		ClassRegistered = false;
@@ -327,7 +426,7 @@ void Overlay::Line(double X1, double Y1, double X2, double Y2, Color Tint, float
 		false,
 		Tint,
 		{}
-	});
+		});
 }
 
 void Overlay::Rectangle(double X1, double Y1, double X2, double Y2, Color Tint, float Thickness)
@@ -343,7 +442,7 @@ void Overlay::Rectangle(double X1, double Y1, double X2, double Y2, Color Tint, 
 		false,
 		Tint,
 		{}
-	});
+		});
 }
 
 void Overlay::Circle(double X, double Y, double Radius, Color Tint, float Thickness, bool Filled)
@@ -359,7 +458,7 @@ void Overlay::Circle(double X, double Y, double Radius, Color Tint, float Thickn
 		Filled,
 		Tint,
 		{}
-	});
+		});
 }
 
 void Overlay::Text(double X, double Y, Color Tint, const std::string& Value)
@@ -375,7 +474,7 @@ void Overlay::Text(double X, double Y, Color Tint, const std::string& Value)
 		false,
 		Tint,
 		Value
-	});
+		});
 }
 
 bool Overlay::RequestRender(HWND GameWindow)
@@ -411,115 +510,228 @@ bool Overlay::RequestRender(HWND GameWindow)
 
 namespace
 {
-bool RenderOnOverlayThread(HWND Window, HWND GameWindow)
-{
-	if (!IsWindow(GameWindow))
-		return false;
-
-	static bool LastStreamProof = false;
-	static bool StreamProofAttempted = false;
-	bool StreamProofEnabled = false;
-	bool HasSettingsSnapshot = false;
+	bool RenderOnOverlayThread(HWND Window, HWND GameWindow)
 	{
-		std::unique_lock<std::recursive_mutex> SettingsLock(SettingsMutex, std::try_to_lock);
-		if (SettingsLock.owns_lock())
+		if (!IsWindow(GameWindow))
+			return false;
+
+		static bool LastStreamProof = false;
+		static bool StreamProofAttempted = false;
+		bool StreamProofEnabled = false;
+		bool HasSettingsSnapshot = false;
 		{
-			StreamProofEnabled = MiscSettings.StreamProof;
-			HasSettingsSnapshot = true;
-		}
-	}
-	if (HasSettingsSnapshot && (!StreamProofAttempted || LastStreamProof != StreamProofEnabled))
-	{
-		const DWORD Affinity = StreamProofEnabled ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
-		if (!SetWindowDisplayAffinity(Window, Affinity))
-		{
-			OutputDebugStringA("[Overlay] Could not update display-capture affinity.\n");
-		}
-		LastStreamProof = StreamProofEnabled;
-		StreamProofAttempted = true;
-	}
-
-	RECT ClientRect{};
-	if (!GetClientRect(GameWindow, &ClientRect))
-		return false;
-	POINT TopLeft{ ClientRect.left, ClientRect.top };
-	if (!ClientToScreen(GameWindow, &TopLeft))
-		return false;
-
-	const int Width = ClientRect.right - ClientRect.left;
-	const int Height = ClientRect.bottom - ClientRect.top;
-	if (Width <= 0 || Height <= 0)
-	{
-		ShowWindow(Window, SW_HIDE);
-		return true;
-	}
-
-	std::vector<DrawCommand> Commands;
-	{
-		std::lock_guard<std::mutex> Lock(DrawMutex);
-		Commands = DrawCommands;
-	}
-
-	HDC ScreenDc = GetDC(nullptr);
-	if (!ScreenDc)
-		return false;
-	if (!RenderSurface.Ensure(ScreenDc, Width, Height))
-	{
-		ReleaseDC(nullptr, ScreenDc);
-		return false;
-	}
-	bool DrawSucceeded = true;
-	{
-		Gdiplus::Bitmap Surface(Width, Height, Width * 4, PixelFormat32bppPARGB, RenderSurface.Pixels);
-		Gdiplus::Graphics Graphics(&Surface);
-		Graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
-		Graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-		Graphics.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
-		DrawSucceeded = Graphics.GetLastStatus() == Gdiplus::Ok;
-		Gdiplus::Font TextFont(L"Segoe UI", 14.0f, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-
-		for (const DrawCommand& Command : Commands)
-		{
-			const Gdiplus::Color Tint = ToGdiColor(Command.Tint);
-			const float Thickness = (Command.Thickness > 0.0f) ? Command.Thickness : 1.0f;
-			Gdiplus::Pen Pen(Tint, Thickness);
-
-			switch (Command.Type)
+			std::unique_lock<std::recursive_mutex> SettingsLock(SettingsMutex, std::try_to_lock);
+			if (SettingsLock.owns_lock())
 			{
-			case DrawType::Line:
-				Graphics.DrawLine(&Pen, Command.X1, Command.Y1, Command.X2, Command.Y2);
-				break;
-			case DrawType::Rectangle:
-				Graphics.DrawRectangle(&Pen, Command.X1, Command.Y1, Command.X2 - Command.X1, Command.Y2 - Command.Y1);
-				break;
-			case DrawType::Circle:
-				if (Command.Filled)
+				StreamProofEnabled = MiscSettings.StreamProof;
+				HasSettingsSnapshot = true;
+			}
+		}
+		if (HasSettingsSnapshot && (!StreamProofAttempted || LastStreamProof != StreamProofEnabled))
+		{
+			const DWORD Affinity = StreamProofEnabled ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE;
+			if (!SetWindowDisplayAffinity(Window, Affinity))
+			{
+				OutputDebugStringA("[Overlay] Could not update display-capture affinity.\n");
+			}
+			LastStreamProof = StreamProofEnabled;
+			StreamProofAttempted = true;
+		}
+
+		RECT ClientRect{};
+		if (!GetClientRect(GameWindow, &ClientRect))
+			return false;
+		POINT TopLeft{ ClientRect.left, ClientRect.top };
+		if (!ClientToScreen(GameWindow, &TopLeft))
+			return false;
+
+		const int Width = ClientRect.right - ClientRect.left;
+		const int Height = ClientRect.bottom - ClientRect.top;
+		if (Width <= 0 || Height <= 0)
+		{
+			ShowWindow(Window, SW_HIDE);
+			return true;
+		}
+
+		std::vector<DrawCommand> Commands;
+		{
+			std::lock_guard<std::mutex> Lock(DrawMutex);
+			Commands = DrawCommands;
+		}
+
+		HDC ScreenDc = GetDC(nullptr);
+		if (!ScreenDc)
+			return false;
+		if (!RenderSurface.Ensure(ScreenDc, Width, Height))
+		{
+			ReleaseDC(nullptr, ScreenDc);
+			return false;
+		}
+		bool DrawSucceeded = true;
+		{
+			Gdiplus::Bitmap Surface(Width, Height, Width * 4, PixelFormat32bppPARGB, RenderSurface.Pixels);
+			Gdiplus::Graphics Graphics(&Surface);
+			Graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
+			Graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+			Graphics.SetCompositingQuality(Gdiplus::CompositingQualityHighQuality);
+			Graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+			Graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+			Graphics.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
+			DrawSucceeded = Graphics.GetLastStatus() == Gdiplus::Ok;
+
+			HudFontCache.Ensure();
+			const Gdiplus::Font* const TextFont = HudFontCache.Text.get();
+			const Gdiplus::StringFormat* const TextFormat = HudFontCache.Format.get();
+			const bool DrawGlow = HudStyle::Glow && Commands.size() <= HudStyle::GlowCommandLimit;
+			const auto MakeRound = [](Gdiplus::Pen& Target)
 				{
-					Gdiplus::SolidBrush Brush(Tint);
-					Graphics.FillEllipse(&Brush, Command.X1 - Command.X2, Command.Y1 - Command.X2, Command.X2 * 2.0f, Command.X2 * 2.0f);
-				}
-				else
-					Graphics.DrawEllipse(&Pen, Command.X1 - Command.X2, Command.Y1 - Command.X2, Command.X2 * 2.0f, Command.X2 * 2.0f);
-				break;
-			case DrawType::Text:
+					Target.SetLineCap(Gdiplus::LineCapRound, Gdiplus::LineCapRound, Gdiplus::DashCapRound);
+					Target.SetLineJoin(Gdiplus::LineJoinRound);
+				};
+
+			for (const DrawCommand& Command : Commands)
 			{
-				Gdiplus::SolidBrush Brush(Tint);
-				std::wstring WideText = ToWideText(Command.Value);
-				Graphics.DrawString(WideText.c_str(), -1, &TextFont, Gdiplus::PointF(Command.X1, Command.Y1), &Brush);
-				break;
-			}
+				const Gdiplus::Color Tint = ToGdiColor(Command.Tint);
+				const Gdiplus::Color GlowTint(
+					ScaleAlpha(Command.Tint.A, HudStyle::GlowAlphaPercent),
+					Command.Tint.R, Command.Tint.G, Command.Tint.B);
+				const bool UseGlow = DrawGlow && Command.Tint.A > 0;
+				const float Thickness = (Command.Thickness > 0.0f) ? Command.Thickness : 1.0f;
+				const float GlowThickness = Thickness + HudStyle::GlowExtraWidth;
+				Gdiplus::Pen Pen(Tint, Thickness);
+				MakeRound(Pen);
+
+				switch (Command.Type)
+				{
+				case DrawType::Line:
+				{
+					if (UseGlow)
+					{
+						Gdiplus::Pen GlowPen(GlowTint, GlowThickness);
+						MakeRound(GlowPen);
+						Graphics.DrawLine(&GlowPen, Command.X1, Command.Y1, Command.X2, Command.Y2);
+					}
+					Graphics.DrawLine(&Pen, Command.X1, Command.Y1, Command.X2, Command.Y2);
+					break;
+				}
+				case DrawType::Rectangle:
+				{
+					const float Left = (std::min)(Command.X1, Command.X2);
+					const float Top = (std::min)(Command.Y1, Command.Y2);
+					const float Right = (std::max)(Command.X1, Command.X2);
+					const float Bottom = (std::max)(Command.Y1, Command.Y2);
+					const float Width = Right - Left;
+					const float Height = Bottom - Top;
+
+					if (HudStyle::BoxFillAlpha > 0 && Width > 0.0f && Height > 0.0f)
+					{
+						const BYTE FillAlpha = static_cast<BYTE>((std::min)(static_cast<int>(Command.Tint.A), HudStyle::BoxFillAlpha));
+						Gdiplus::SolidBrush FillBrush(Gdiplus::Color(FillAlpha, Command.Tint.R, Command.Tint.G, Command.Tint.B));
+						Graphics.FillRectangle(&FillBrush, Left, Top, Width, Height);
+					}
+
+					const float Shorter = (std::min)(Width, Height);
+					if (HudStyle::CornerBrackets && Shorter >= HudStyle::BracketMinLength * 2.0f)
+					{
+						const float Length = std::clamp(Shorter * HudStyle::BracketRatio,
+							HudStyle::BracketMinLength, HudStyle::BracketMaxLength);
+						Gdiplus::GraphicsPath Brackets;
+						AddCornerBrackets(Brackets, Left, Top, Right, Bottom, Length);
+						if (UseGlow)
+						{
+							Gdiplus::Pen GlowPen(GlowTint, GlowThickness);
+							MakeRound(GlowPen);
+							Graphics.DrawPath(&GlowPen, &Brackets);
+						}
+						Graphics.DrawPath(&Pen, &Brackets);
+					}
+					else
+					{
+						if (UseGlow)
+						{
+							Gdiplus::Pen GlowPen(GlowTint, GlowThickness);
+							MakeRound(GlowPen);
+							Graphics.DrawRectangle(&GlowPen, Left, Top, Width, Height);
+						}
+						Graphics.DrawRectangle(&Pen, Left, Top, Width, Height);
+					}
+					break;
+				}
+				case DrawType::Circle:
+				{
+					const float Radius = Command.X2;
+					const float Diameter = Radius * 2.0f;
+					if (UseGlow)
+					{
+						Gdiplus::Pen GlowPen(GlowTint, Command.Filled ? (1.0f + HudStyle::GlowExtraWidth) : GlowThickness);
+						MakeRound(GlowPen);
+						Graphics.DrawEllipse(&GlowPen, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);
+					}
+					if (Command.Filled)
+					{
+						Gdiplus::SolidBrush Brush(Tint);
+						Graphics.FillEllipse(&Brush, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);
+					}
+					else
+						Graphics.DrawEllipse(&Pen, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);
+					break;
+				}
+				case DrawType::Text:
+				{
+					std::wstring WideText = ToWideText(Command.Value);
+					if (WideText.empty())
+						break;
+
+					const Gdiplus::PointF Origin(Command.X1, Command.Y1);
+
+					// Dark chamfered tag with a neon edge bar, sized to the text.
+					Gdiplus::RectF TextBounds;
+					if (Graphics.MeasureString(WideText.c_str(), -1, TextFont, Origin, TextFormat, &TextBounds) == Gdiplus::Ok &&
+						TextBounds.Width > 0.0f && TextBounds.Height > 0.0f)
+					{
+						const float Left = Origin.X - HudStyle::TextPaddingX;
+						const float Top = TextBounds.Y + 1.0f;
+						const float Right = TextBounds.X + TextBounds.Width;
+						const float Bottom = TextBounds.Y + TextBounds.Height - 1.0f;
+						if (Right > Left && Bottom > Top + HudStyle::TextCut)
+						{
+							Gdiplus::GraphicsPath Tag;
+							AddChamferedPolygon(Tag, Left, Top, Right, Bottom, HudStyle::TextCut);
+							Gdiplus::SolidBrush TagBrush(Gdiplus::Color(ScaleAlpha(Command.Tint.A, 60), 6, 8, 12));
+							Graphics.FillPath(&TagBrush, &Tag);
+							Gdiplus::SolidBrush BarBrush(Tint);
+							Graphics.FillRectangle(&BarBrush, Left, Top + HudStyle::TextCut, 2.0f, (Bottom - Top) - HudStyle::TextCut);
+						}
+					}
+
+					// One soft drop shadow instead of the old 8-pass outline.
+					Gdiplus::SolidBrush ShadowBrush(Gdiplus::Color(ScaleAlpha(Command.Tint.A, 70), 0, 0, 0));
+					Graphics.DrawString(
+						WideText.c_str(), -1, TextFont,
+						Gdiplus::PointF(Origin.X + 1.0f, Origin.Y + 1.0f),
+						TextFormat, &ShadowBrush);
+
+					Gdiplus::SolidBrush Brush(Tint);
+					Graphics.DrawString(WideText.c_str(), -1, TextFont, Origin, TextFormat, &Brush);
+					break;
+				}
+				}
 			}
 		}
+
+		POINT SourcePoint{ 0, 0 };
+		SIZE SurfaceSize{ Width, Height };
+		BLENDFUNCTION Blend{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+		const bool LayerUpdated = UpdateLayeredWindow(
+			Window, ScreenDc, &TopLeft, &SurfaceSize,
+			RenderSurface.MemoryDc, &SourcePoint, 0, &Blend, ULW_ALPHA) != FALSE;
+
+		SetWindowPos(
+			Window, HWND_TOPMOST,
+			TopLeft.x, TopLeft.y, Width, Height,
+			SWP_NOACTIVATE | (LayerUpdated ? SWP_SHOWWINDOW : 0));
+
+		ReleaseDC(nullptr, ScreenDc);
+		return DrawSucceeded && LayerUpdated;
 	}
-
-	POINT SourcePoint{ 0, 0 };
-	SIZE SurfaceSize{ Width, Height };
-	BLENDFUNCTION Blend{ AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-	const bool LayerUpdated = UpdateLayeredWindow(Window, ScreenDc, &TopLeft, &SurfaceSize, RenderSurface.MemoryDc, &SourcePoint, 0, &Blend, ULW_ALPHA) != FALSE;
-	if (!IsWindowVisible(Window))
-		SetWindowPos(Window, HWND_TOPMOST, TopLeft.x, TopLeft.y, Width, Height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-
-	ReleaseDC(nullptr, ScreenDc);
-	return DrawSucceeded && LayerUpdated;
-}
 }

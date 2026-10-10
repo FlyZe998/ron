@@ -7,6 +7,7 @@
 #include <uxtheme.h>
 #include <algorithm>
 #include <cmath>
+#include <windowsx.h>
 
 #pragma comment(lib, "Comctl32.lib")
 #pragma comment(lib, "Comdlg32.lib")
@@ -25,14 +26,22 @@ namespace
 	constexpr int UninjectHotKeyId = 2;
 	constexpr UINT_PTR PageWheelSubclassId = 1;
 	constexpr DWORD DwmwaUseImmersiveDarkMode = 20;
-	constexpr COLORREF MenuBackgroundColor = RGB(12, 15, 22);
-	constexpr COLORREF MenuPanelColor = RGB(20, 25, 35);
-	constexpr COLORREF MenuPanelHoverColor = RGB(29, 37, 51);
-	constexpr COLORREF MenuBorderColor = RGB(39, 49, 66);
-	constexpr COLORREF MenuTextColor = RGB(232, 238, 247);
-	constexpr COLORREF MenuMutedTextColor = RGB(132, 147, 168);
-	constexpr COLORREF MenuAccentColor = RGB(72, 176, 224);
-	constexpr COLORREF MenuEnabledColor = RGB(31, 93, 125);
+	constexpr DWORD DwmwaBorderColor = 34;
+	constexpr DWORD DwmwaCaptionColor = 35;
+	constexpr DWORD DwmwaTextColor = 36;
+	constexpr COLORREF MenuBackgroundColor = RGB(9, 9, 13);
+	constexpr COLORREF MenuPanelColor = RGB(20, 20, 26);
+	constexpr COLORREF MenuPanelHoverColor = RGB(34, 33, 20);
+	constexpr COLORREF MenuBorderColor = RGB(52, 52, 64);
+	constexpr COLORREF MenuHotBorderColor = RGB(150, 142, 18);
+	constexpr COLORREF MenuTextColor = RGB(236, 236, 228);
+	constexpr COLORREF MenuMutedTextColor = RGB(132, 132, 120);
+	constexpr COLORREF MenuAccentColor = RGB(252, 238, 9);
+	constexpr COLORREF MenuAccent2Color = RGB(0, 240, 255);
+	constexpr COLORREF MenuEnabledColor = RGB(38, 36, 8);
+	constexpr COLORREF MenuDangerColor = RGB(255, 38, 76);
+	constexpr COLORREF MenuDangerDimColor = RGB(128, 24, 46);
+	constexpr COLORREF MenuDangerHoverColor = RGB(44, 14, 22);
 
 	enum class BindingType
 	{
@@ -137,17 +146,52 @@ namespace
 		SetWindowTheme(Control, L"DarkMode_Explorer", nullptr);
 	}
 
-	void DrawRoundedRect(HDC DeviceContext, const RECT& Bounds, COLORREF Fill, COLORREF Border, int Radius = 8)
+	void FillSolid(HDC DeviceContext, const RECT& Area, COLORREF Color)
 	{
+		const COLORREF PreviousColor = SetBkColor(DeviceContext, Color);
+		ExtTextOutW(DeviceContext, 0, 0, ETO_OPAQUE, &Area, nullptr, 0, nullptr);
+		SetBkColor(DeviceContext, PreviousColor);
+	}
+
+	void DrawChamferRect(HDC DeviceContext, const RECT& Bounds, COLORREF Fill, COLORREF Border, int Cut = 6)
+	{
+		const int Left = Bounds.left;
+		const int Top = Bounds.top;
+		const int Right = Bounds.right - 1;
+		const int Bottom = Bounds.bottom - 1;
+		if (Right <= Left || Bottom <= Top)
+			return;
+
+		const int Chamfer = (std::min)(Cut, (std::min)(Right - Left, Bottom - Top) / 2);
+		const POINT Points[6] = {
+			{ Left + Chamfer, Top },
+			{ Right, Top },
+			{ Right, Bottom - Chamfer },
+			{ Right - Chamfer, Bottom },
+			{ Left, Bottom },
+			{ Left, Top + Chamfer }
+		};
 		HBRUSH Brush = CreateSolidBrush(Fill);
 		HPEN Pen = CreatePen(PS_SOLID, 1, Border);
 		HGDIOBJ PreviousBrush = SelectObject(DeviceContext, Brush);
 		HGDIOBJ PreviousPen = SelectObject(DeviceContext, Pen);
-		RoundRect(DeviceContext, Bounds.left, Bounds.top, Bounds.right, Bounds.bottom, Radius, Radius);
+		Polygon(DeviceContext, Points, 6);
 		SelectObject(DeviceContext, PreviousBrush);
 		SelectObject(DeviceContext, PreviousPen);
 		DeleteObject(Brush);
 		DeleteObject(Pen);
+	}
+
+	bool IsDangerAction(Action Selected)
+	{
+		return Selected == Action::KillSuspects || Selected == Action::KillCivilians;
+	}
+
+	bool IsTrackbarWindow(HWND Window)
+	{
+		wchar_t ClassName[32]{};
+		return GetClassNameW(Window, ClassName, static_cast<int>(std::size(ClassName))) > 0 &&
+			wcscmp(ClassName, TRACKBAR_CLASSW) == 0;
 	}
 
 	void DrawOwnerButton(const DRAWITEMSTRUCT& DrawItem)
@@ -159,46 +203,59 @@ namespace
 			BindingIt->second.Type == BindingType::Boolean;
 		const auto ColorIt = ColorBindings.find(Id);
 		const bool IsColorButton = ColorIt != ColorBindings.end();
+		const auto ActionIt = Actions.find(Id);
+		const bool IsDanger = ActionIt != Actions.end() && IsDangerAction(ActionIt->second);
 		const bool IsChecked = IsCheck &&
 			*static_cast<const bool*>(BindingIt->second.Address);
 		const bool IsDisabled = (DrawItem.itemState & ODS_DISABLED) != 0;
 		const bool IsHot = (DrawItem.itemState & ODS_HOTLIGHT) != 0;
 		const bool IsPressed = (DrawItem.itemState & ODS_SELECTED) != 0;
+		const bool Flash = IsPressed && !IsCheck && !IsDisabled;
+
 		const COLORREF Fill = IsDisabled ? MenuBackgroundColor
+			: Flash ? (IsDanger ? MenuDangerColor : MenuAccentColor)
 			: IsChecked ? MenuEnabledColor
-			: IsHot ? MenuPanelHoverColor : MenuPanelColor;
+			: IsHot ? (IsDanger ? MenuDangerHoverColor : MenuPanelHoverColor) : MenuPanelColor;
+		const COLORREF Border = IsDisabled ? MenuBorderColor
+			: IsDanger ? ((IsHot || Flash) ? MenuDangerColor : MenuDangerDimColor)
+			: IsChecked ? MenuAccentColor
+			: IsHot ? MenuHotBorderColor : MenuBorderColor;
+		const COLORREF TextColor = IsDisabled ? MenuMutedTextColor
+			: Flash ? RGB(0, 0, 0)
+			: IsDanger ? MenuDangerColor
+			: IsChecked ? MenuAccentColor : MenuTextColor;
 
 		RECT Bounds = DrawItem.rcItem;
 		InflateRect(&Bounds, -1, -1);
-		DrawRoundedRect(DrawItem.hDC, Bounds, Fill,
-			IsChecked ? MenuAccentColor : IsHot ? RGB(57, 75, 99) : MenuBorderColor,
-			IsCheck ? 12 : 8);
+		const int Cut = IsCheck ? 8 : 6;
+		DrawChamferRect(DrawItem.hDC, Bounds, Fill, Border, Cut);
 		SetBkMode(DrawItem.hDC, TRANSPARENT);
-		SetTextColor(DrawItem.hDC, IsDisabled ? MenuMutedTextColor : MenuTextColor);
+		SetTextColor(DrawItem.hDC, TextColor);
 
 		if (IsCheck)
 		{
+			if (IsChecked)
+			{
+				RECT Bar{ Bounds.left, Bounds.top + Cut, Bounds.left + 3, Bounds.bottom };
+				FillSolid(DrawItem.hDC, Bar, MenuAccentColor);
+			}
+
 			const int ToggleWidth = 34;
-			const int ToggleHeight = 18;
-			const int ToggleLeft = Bounds.right - ToggleWidth - 12;
+			const int ToggleHeight = 16;
+			const int ToggleLeft = Bounds.right - ToggleWidth - 14;
 			const int ToggleTop = Bounds.top + ((Bounds.bottom - Bounds.top) - ToggleHeight) / 2;
 			RECT Toggle{ ToggleLeft, ToggleTop, ToggleLeft + ToggleWidth, ToggleTop + ToggleHeight };
-			DrawRoundedRect(DrawItem.hDC, Toggle,
-				IsChecked ? MenuAccentColor : RGB(43, 53, 69),
-				IsChecked ? MenuAccentColor : RGB(43, 53, 69), ToggleHeight);
-			const int KnobDiameter = 12;
-			const int KnobLeft = IsChecked ? Toggle.right - KnobDiameter - 3 : Toggle.left + 3;
-			const int KnobTop = Toggle.top + (ToggleHeight - KnobDiameter) / 2;
-			HBRUSH KnobBrush = CreateSolidBrush(RGB(246, 249, 252));
-			HGDIOBJ PreviousBrush = SelectObject(DrawItem.hDC, KnobBrush);
-			HGDIOBJ PreviousPen = SelectObject(DrawItem.hDC, GetStockObject(NULL_PEN));
-			Ellipse(DrawItem.hDC, KnobLeft, KnobTop, KnobLeft + KnobDiameter, KnobTop + KnobDiameter);
-			SelectObject(DrawItem.hDC, PreviousBrush);
-			SelectObject(DrawItem.hDC, PreviousPen);
-			DeleteObject(KnobBrush);
+			DrawChamferRect(DrawItem.hDC, Toggle,
+				IsChecked ? MenuAccentColor : RGB(30, 30, 38),
+				IsChecked ? MenuAccentColor : RGB(84, 84, 102), 4);
+			const int KnobSize = 8;
+			const int KnobLeft = IsChecked ? Toggle.right - KnobSize - 4 : Toggle.left + 4;
+			const int KnobTop = Toggle.top + (ToggleHeight - KnobSize) / 2;
+			RECT Knob{ KnobLeft, KnobTop, KnobLeft + KnobSize, KnobTop + KnobSize };
+			FillSolid(DrawItem.hDC, Knob, IsChecked ? RGB(9, 9, 13) : RGB(130, 130, 150));
 
 			RECT TextBounds = Bounds;
-			TextBounds.left += 12;
+			TextBounds.left += 14;
 			TextBounds.right = ToggleLeft - 10;
 			const int TextLength = GetWindowTextLengthW(DrawItem.hwndItem);
 			std::wstring Text(static_cast<size_t>(TextLength) + 1, L'\0');
@@ -218,7 +275,7 @@ namespace
 					static_cast<BYTE>(std::clamp(Color.x, 0.0f, 1.0f) * 255.0f),
 					static_cast<BYTE>(std::clamp(Color.y, 0.0f, 1.0f) * 255.0f),
 					static_cast<BYTE>(std::clamp(Color.z, 0.0f, 1.0f) * 255.0f));
-				DrawRoundedRect(DrawItem.hDC, Swatch, SwatchColor, MenuBorderColor, 5);
+				DrawChamferRect(DrawItem.hDC, Swatch, SwatchColor, MenuTextColor, 3);
 				TextBounds.left += 26;
 			}
 			if (IsPressed)
@@ -244,10 +301,10 @@ namespace
 		InflateRect(&Bounds, -3, -3);
 		const bool IsSelected = static_cast<int>(DrawItem.itemID) == CurrentPage;
 		const bool IsHot = (DrawItem.itemState & ODS_HOTLIGHT) != 0;
-		const COLORREF Fill = IsSelected ? MenuEnabledColor
+		const COLORREF Fill = IsSelected ? MenuAccentColor
 			: IsHot ? MenuPanelHoverColor : MenuPanelColor;
-		DrawRoundedRect(DrawItem.hDC, Bounds, Fill,
-			IsSelected ? MenuAccentColor : MenuBorderColor, 9);
+		DrawChamferRect(DrawItem.hDC, Bounds, Fill,
+			IsSelected ? MenuAccentColor : IsHot ? MenuHotBorderColor : MenuBorderColor, 7);
 
 		TCITEMW Item{};
 		wchar_t Text[64]{};
@@ -257,8 +314,188 @@ namespace
 		if (!TabCtrl_GetItem(DrawItem.hwndItem, static_cast<int>(DrawItem.itemID), &Item))
 			return;
 		SetBkMode(DrawItem.hDC, TRANSPARENT);
-		SetTextColor(DrawItem.hDC, IsSelected ? RGB(255, 255, 255) : MenuMutedTextColor);
+		SetTextColor(DrawItem.hDC, IsSelected ? RGB(0, 0, 0) : IsHot ? MenuTextColor : MenuMutedTextColor);
 		DrawTextW(DrawItem.hDC, Text, -1, &Bounds, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_END_ELLIPSIS);
+	}
+
+	LRESULT CALLBACK TabControlProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam,
+		UINT_PTR SubclassId, DWORD_PTR)
+	{
+		static int HotTab = -1;
+		switch (Message)
+		{
+		case WM_ERASEBKGND:
+			return TRUE;
+		case WM_PAINT:
+		case WM_PRINTCLIENT:
+		{
+			PAINTSTRUCT Paint{};
+			HDC TargetDc = (Message == WM_PAINT) ? BeginPaint(Window, &Paint) : reinterpret_cast<HDC>(WParam);
+			if (TargetDc)
+			{
+				RECT Client{};
+				GetClientRect(Window, &Client);
+				const int Width = Client.right - Client.left;
+				const int Height = Client.bottom - Client.top;
+				HDC BufferDc = CreateCompatibleDC(TargetDc);
+				HBITMAP BufferBitmap = (BufferDc && Width > 0 && Height > 0)
+					? CreateCompatibleBitmap(TargetDc, Width, Height) : nullptr;
+				HDC Dc = BufferBitmap ? BufferDc : TargetDc;
+				HGDIOBJ PreviousBitmap = BufferBitmap ? SelectObject(BufferDc, BufferBitmap) : nullptr;
+
+				FillRect(Dc, &Client, MenuBackgroundBrush);
+				HGDIOBJ PreviousFont = MenuFont ? SelectObject(Dc, MenuFont) : nullptr;
+				const int Count = TabCtrl_GetItemCount(Window);
+				for (int Index = 0; Index < Count; ++Index)
+				{
+					RECT ItemBounds{};
+					if (!TabCtrl_GetItemRect(Window, Index, &ItemBounds))
+						continue;
+					DRAWITEMSTRUCT Item{};
+					Item.CtlType = ODT_TAB;
+					Item.CtlID = TabControlId;
+					Item.itemID = static_cast<UINT>(Index);
+					Item.itemAction = ODA_DRAWENTIRE;
+					Item.itemState = (Index == HotTab) ? ODS_HOTLIGHT : 0;
+					Item.hwndItem = Window;
+					Item.hDC = Dc;
+					Item.rcItem = ItemBounds;
+					DrawOwnerTab(Item);
+				}
+				if (PreviousFont)
+					SelectObject(Dc, PreviousFont);
+
+				if (BufferBitmap)
+				{
+					BitBlt(TargetDc, 0, 0, Width, Height, BufferDc, 0, 0, SRCCOPY);
+					SelectObject(BufferDc, PreviousBitmap);
+					DeleteObject(BufferBitmap);
+				}
+				if (BufferDc)
+					DeleteDC(BufferDc);
+			}
+			if (Message == WM_PAINT)
+				EndPaint(Window, &Paint);
+			return 0;
+		}
+		case WM_MOUSEMOVE:
+		{
+			TRACKMOUSEEVENT Track{ sizeof(Track), TME_LEAVE, Window, 0 };
+			TrackMouseEvent(&Track);
+			TCHITTESTINFO Hit{};
+			Hit.pt = POINT{ GET_X_LPARAM(LParam), GET_Y_LPARAM(LParam) };
+			const int Tab = TabCtrl_HitTest(Window, &Hit);
+			if (Tab != HotTab)
+			{
+				HotTab = Tab;
+				InvalidateRect(Window, nullptr, FALSE);
+			}
+			break;
+		}
+		case WM_MOUSELEAVE:
+			if (HotTab != -1)
+			{
+				HotTab = -1;
+				InvalidateRect(Window, nullptr, FALSE);
+			}
+			break;
+		case WM_NCDESTROY:
+			RemoveWindowSubclass(Window, TabControlProc, SubclassId);
+			break;
+		}
+		return DefSubclassProc(Window, Message, WParam, LParam);
+	}
+
+	LRESULT CustomDrawTrackbar(NMCUSTOMDRAW& Draw)
+	{
+		switch (Draw.dwDrawStage)
+		{
+		case CDDS_PREPAINT:
+			return CDRF_NOTIFYITEMDRAW;
+		case CDDS_ITEMPREPAINT:
+			switch (Draw.dwItemSpec)
+			{
+			case TBCD_TICS:
+				return CDRF_SKIPDEFAULT;
+			case TBCD_CHANNEL:
+			{
+				RECT Thumb{};
+				SendMessageW(Draw.hdr.hwndFrom, TBM_GETTHUMBRECT, 0, reinterpret_cast<LPARAM>(&Thumb));
+				const int Middle = (Draw.rc.top + Draw.rc.bottom) / 2;
+				RECT Track{ Draw.rc.left, Middle - 2, Draw.rc.right, Middle + 2 };
+				FillSolid(Draw.hdc, Track, RGB(40, 40, 50));
+				RECT Filled{ Track.left, Track.top, (std::max)(Track.left, (Thumb.left + Thumb.right) / 2), Track.bottom };
+				FillSolid(Draw.hdc, Filled, MenuAccentColor);
+				return CDRF_SKIPDEFAULT;
+			}
+			case TBCD_THUMB:
+			{
+				RECT Thumb = Draw.rc;
+				InflateRect(&Thumb, 0, -1);
+				const bool Pressed = (Draw.uItemState & CDIS_SELECTED) != 0;
+				DrawChamferRect(Draw.hdc, Thumb,
+					Pressed ? RGB(255, 255, 255) : MenuAccentColor,
+					Pressed ? RGB(255, 255, 255) : MenuAccentColor, 3);
+				return CDRF_SKIPDEFAULT;
+			}
+			}
+			break;
+		}
+		return CDRF_DODEFAULT;
+	}
+
+	void DrawWindowFrame(HDC DeviceContext, const RECT& Client)
+	{
+		const int Width = Client.right - Client.left;
+		const int Height = Client.bottom - Client.top;
+		if (Width < 160 || Height < 160)
+			return;
+
+		const auto Fill = [&](int Left, int Top, int Right, int Bottom, COLORREF Color)
+		{
+			const RECT Area{ Left, Top, Right, Bottom };
+			FillSolid(DeviceContext, Area, Color);
+		};
+		const int Inset = 3;
+		const int Arm = 18;
+
+		Fill(Inset, Inset, Width - Inset, Inset + 1, MenuBorderColor);
+		Fill(Inset, Height - Inset - 1, Width - Inset, Height - Inset, MenuBorderColor);
+		Fill(Inset, Inset, Inset + 1, Height - Inset, MenuBorderColor);
+		Fill(Width - Inset - 1, Inset, Width - Inset, Height - Inset, MenuBorderColor);
+
+		Fill(Inset, Inset, Inset + Arm, Inset + 2, MenuAccentColor);
+		Fill(Inset, Inset, Inset + 2, Inset + Arm, MenuAccentColor);
+		Fill(Width - Inset - Arm, Inset, Width - Inset, Inset + 2, MenuAccentColor);
+		Fill(Width - Inset - 2, Inset, Width - Inset, Inset + Arm, MenuAccentColor);
+		Fill(Inset, Height - Inset - 2, Inset + Arm, Height - Inset, MenuAccentColor);
+		Fill(Inset, Height - Inset - Arm, Inset + 2, Height - Inset, MenuAccentColor);
+		Fill(Width - Inset - Arm, Height - Inset - 2, Width - Inset, Height - Inset, MenuAccent2Color);
+		Fill(Width - Inset - 2, Height - Inset - Arm, Width - Inset, Height - Inset, MenuAccent2Color);
+
+		Fill(10, 75, Width - 10, 76, MenuBorderColor);
+		Fill(10, 75, 64, 77, MenuAccentColor);
+		Fill(Width - 64, 75, Width - 10, 77, MenuAccent2Color);
+	}
+
+	int CALLBACK FontFaceFound(const LOGFONTW*, const TEXTMETRICW*, DWORD, LPARAM Found)
+	{
+		*reinterpret_cast<bool*>(Found) = true;
+		return 0;
+	}
+
+	bool FontFaceInstalled(const wchar_t* Face)
+	{
+		LOGFONTW Query{};
+		Query.lfCharSet = DEFAULT_CHARSET;
+		wcscpy_s(Query.lfFaceName, Face);
+		bool Found = false;
+		HDC ScreenDc = GetDC(nullptr);
+		if (!ScreenDc)
+			return false;
+		EnumFontFamiliesExW(ScreenDc, &Query, FontFaceFound, reinterpret_cast<LPARAM>(&Found), 0);
+		ReleaseDC(nullptr, ScreenDc);
+		return Found;
 	}
 
 	void ResetToolTips()
@@ -267,10 +504,13 @@ namespace
 			DestroyWindow(ToolTipWindow);
 		ToolTipTexts.clear();
 		ToolTipWindow = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
-			WS_POPUP | TTS_ALWAYSTIP | TTS_BALLOON, CW_USEDEFAULT, CW_USEDEFAULT,
+			WS_POPUP | TTS_ALWAYSTIP, CW_USEDEFAULT, CW_USEDEFAULT,
 			CW_USEDEFAULT, CW_USEDEFAULT, MenuWindow, nullptr, ModuleInstance, nullptr);
 		if (ToolTipWindow)
 		{
+			SetWindowTheme(ToolTipWindow, L"", L"");
+			SendMessageW(ToolTipWindow, TTM_SETTIPBKCOLOR, static_cast<WPARAM>(RGB(14, 14, 20)), 0);
+			SendMessageW(ToolTipWindow, TTM_SETTIPTEXTCOLOR, static_cast<WPARAM>(MenuAccentColor), 0);
 			SendMessageW(ToolTipWindow, TTM_SETMAXTIPWIDTH, 0, 360);
 			SendMessageW(ToolTipWindow, TTM_SETDELAYTIME, TTDT_INITIAL, 350);
 		}
@@ -920,11 +1160,18 @@ namespace
 			MenuWindow = Window;
 			const BOOL UseDarkTitleBar = TRUE;
 			DwmSetWindowAttribute(Window, DwmwaUseImmersiveDarkMode, &UseDarkTitleBar, sizeof(UseDarkTitleBar));
+			const COLORREF CaptionColor = MenuBackgroundColor;
+			const COLORREF FrameColor = MenuAccentColor;
+			const COLORREF CaptionTextColor = MenuAccentColor;
+			DwmSetWindowAttribute(Window, DwmwaCaptionColor, &CaptionColor, sizeof(CaptionColor));
+			DwmSetWindowAttribute(Window, DwmwaBorderColor, &FrameColor, sizeof(FrameColor));
+			DwmSetWindowAttribute(Window, DwmwaTextColor, &CaptionTextColor, sizeof(CaptionTextColor));
 			RECT Client{};
 			GetClientRect(Window, &Client);
 			TabControl = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_OWNERDRAWFIXED | TCS_FIXEDWIDTH,
 				10, 10, Client.right - 20, 34, Window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(TabControlId)), ModuleInstance, nullptr);
 			StyleControl(TabControl);
+			SetWindowSubclass(TabControl, TabControlProc, 2, 0);
 			SendMessageW(TabControl, TCM_SETITEMSIZE, 0, MAKELPARAM(77, 32));
 			HeaderLabel = CreateWindowExW(0, L"STATIC",
 				L"CONTROL CENTER",
@@ -932,7 +1179,7 @@ namespace
 			if (HeaderFont)
 				SendMessageW(HeaderLabel, WM_SETFONT, reinterpret_cast<WPARAM>(HeaderFont), TRUE);
 			CreditLabel = CreateWindowExW(0, L"STATIC", L"FlyZe998",
-				WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 240, 51, 200, 22,
+				WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, (Client.right - 120) / 2, 51, 120, 22,
 				Window, nullptr, ModuleInstance, nullptr);
 			SessionLabel = CreateWindowExW(0, L"STATIC", L"ROLE: WAITING FOR SESSION",
 				WS_CHILD | WS_VISIBLE | SS_RIGHT, 445, 51, Client.right - 463, 22,
@@ -958,14 +1205,18 @@ namespace
 			return 0;
 		}
 		case WM_NOTIFY:
-			if (reinterpret_cast<NMHDR*>(LParam)->idFrom == TabControlId &&
-				reinterpret_cast<NMHDR*>(LParam)->code == TCN_SELCHANGE)
+		{
+			const NMHDR* Header = reinterpret_cast<const NMHDR*>(LParam);
+			if (Header->code == NM_CUSTOMDRAW && IsTrackbarWindow(Header->hwndFrom))
+				return CustomDrawTrackbar(*reinterpret_cast<NMCUSTOMDRAW*>(LParam));
+			if (Header->idFrom == TabControlId && Header->code == TCN_SELCHANGE)
 			{
 				CurrentPage = TabCtrl_GetCurSel(TabControl);
 				CreatePage(CurrentPage);
 				InvalidateRect(TabControl, nullptr, TRUE);
 			}
 			break;
+		}
 		case WM_DRAWITEM:
 		{
 			const auto* DrawItem = reinterpret_cast<const DRAWITEMSTRUCT*>(LParam);
@@ -981,31 +1232,41 @@ namespace
 			}
 			if (DrawItem->CtlType == ODT_STATIC && DrawItem->hwndItem == CreditLabel)
 			{
+				FillRect(DrawItem->hDC, &DrawItem->rcItem, MenuBackgroundBrush);
 				SetBkMode(DrawItem->hDC, TRANSPARENT);
 				HFONT Font = HeaderFont ? HeaderFont : MenuFont;
 				HGDIOBJ PreviousFont = Font ? SelectObject(DrawItem->hDC, Font) : nullptr;
 				const wchar_t* Credit = L"FlyZe998";
-				const size_t Length = wcslen(Credit);
-				int X = DrawItem->rcItem.left + 2;
-				const int Y = DrawItem->rcItem.top;
-				for (size_t Index = 0; Index < Length; ++Index)
-				{
-					const double Phase = static_cast<double>(Index) * 0.48;
-					const BYTE R = static_cast<BYTE>(127.5 * (std::sin(Phase) + 1.0));
-					const BYTE G = static_cast<BYTE>(127.5 * (std::sin(Phase + 2.094) + 1.0));
-					const BYTE B = static_cast<BYTE>(127.5 * (std::sin(Phase + 4.188) + 1.0));
-					SetTextColor(DrawItem->hDC, RGB(R, G, B));
-					wchar_t Character[2]{ Credit[Index], L'\0' };
-					TextOutW(DrawItem->hDC, X, Y + 2, Character, 1);
-					SIZE Extent{};
-					GetTextExtentPoint32W(DrawItem->hDC, Character, 1, &Extent);
-					X += Extent.cx;
-				}
+				const int Length = static_cast<int>(wcslen(Credit));
+				SIZE Extent{};
+				GetTextExtentPoint32W(DrawItem->hDC, Credit, Length, &Extent);
+				const int X = DrawItem->rcItem.left + ((DrawItem->rcItem.right - DrawItem->rcItem.left) - Extent.cx) / 2;
+				const int Y = DrawItem->rcItem.top + 2;
+				const int Ghost = ((GetTickCount() / 1000) % 9 == 0) ? 2 : 1;
+				SetTextColor(DrawItem->hDC, MenuDangerColor);
+				TextOutW(DrawItem->hDC, X - Ghost, Y, Credit, Length);
+				SetTextColor(DrawItem->hDC, MenuAccent2Color);
+				TextOutW(DrawItem->hDC, X + Ghost, Y, Credit, Length);
+				SetTextColor(DrawItem->hDC, MenuAccentColor);
+				TextOutW(DrawItem->hDC, X, Y, Credit, Length);
 				if (PreviousFont)
 					SelectObject(DrawItem->hDC, PreviousFont);
 				return TRUE;
 			}
 			break;
+		}
+		case WM_PAINT:
+		{
+			PAINTSTRUCT Paint{};
+			HDC PaintDc = BeginPaint(Window, &Paint);
+			if (PaintDc)
+			{
+				RECT Client{};
+				GetClientRect(Window, &Client);
+				DrawWindowFrame(PaintDc, Client);
+			}
+			EndPaint(Window, &Paint);
+			return 0;
 		}
 		case WM_TIMER:
 			UpdateSessionStatus();
@@ -1023,7 +1284,7 @@ namespace
 			if (HeaderLabel)
 				MoveWindow(HeaderLabel, 18, 51, 215, 22, TRUE);
 			if (CreditLabel)
-				MoveWindow(CreditLabel, 238, 51, 202, 22, TRUE);
+				MoveWindow(CreditLabel, (std::max)(240, (Width - 120) / 2), 51, 120, 22, TRUE);
 			if (SessionLabel)
 			{
 				const int SessionLeft = (std::max)(18, Width - 285);
@@ -1034,6 +1295,7 @@ namespace
 				MoveWindow(PageContainer, 10, 78, (std::max)(0, Width - 20), (std::max)(0, Height - 88), TRUE);
 				UpdatePageScrollBar();
 			}
+			InvalidateRect(Window, nullptr, TRUE);
 			return 0;
 		}
 		case WM_VSCROLL:
@@ -1055,7 +1317,8 @@ namespace
 			HDC DeviceContext = reinterpret_cast<HDC>(WParam);
 			const HWND Control = reinterpret_cast<HWND>(LParam);
 			SetTextColor(DeviceContext,
-				(Control == HeaderLabel || Control == SessionLabel) ? MenuAccentColor : MenuTextColor);
+				Control == HeaderLabel ? MenuAccentColor
+				: Control == SessionLabel ? MenuAccent2Color : MenuTextColor);
 			SetBkColor(DeviceContext, MenuBackgroundColor);
 			SetBkMode(DeviceContext, OPAQUE);
 			return reinterpret_cast<LRESULT>(MenuBackgroundBrush);
@@ -1227,10 +1490,11 @@ namespace
 		InitCommonControlsEx(&Controls);
 		MenuBackgroundBrush = CreateSolidBrush(MenuBackgroundColor);
 		MenuPanelBrush = CreateSolidBrush(MenuPanelColor);
+		const wchar_t* FontFace = FontFaceInstalled(L"Bahnschrift") ? L"Bahnschrift" : L"Segoe UI";
 		MenuFont = CreateFontW(-17, 0, 0, 0, FW_MEDIUM, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, FontFace);
 		HeaderFont = CreateFontW(-19, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+			OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, FontFace);
 		WNDCLASSEXW PageClass{};
 		PageClass.cbSize = sizeof(PageClass);
 		PageClass.lpfnWndProc = PageContainerProc;
@@ -1273,8 +1537,8 @@ namespace
 			return 1;
 		}
 
-		MenuWindow = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, WindowClassName, L"RON | Control Deck",
-			WS_OVERLAPPEDWINDOW, 100, 100, 750, 760, nullptr, nullptr, ModuleInstance, nullptr);
+		MenuWindow = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, WindowClassName, L"RON // CONTROL DECK",
+			WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, 100, 100, 750, 760, nullptr, nullptr, ModuleInstance, nullptr);
 		if (!MenuWindow)
 		{
 			UnregisterClassW(WindowClassName, ModuleInstance);
