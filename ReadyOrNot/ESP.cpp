@@ -290,7 +290,7 @@ void Cheats::RenderESP()
 
         auto GetBoneScreenPosition = [&](int BoneIndex, FVector2D& ScreenPosition)
         {
-            if (BoneIndex < 0 || BoneIndex > 5000)
+                if (BoneIndex < 0 || BoneIndex >= Mesh->GetNumBones())
             {
                 return false;
             }
