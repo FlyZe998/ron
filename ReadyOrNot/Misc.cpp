@@ -9,7 +9,6 @@
 #include "Overlay.h"
 
 #include "SDK/Engine_classes.hpp"
-//#include "SDK/ReadyOrNot_classes.hpp"
 #include <chrono>
 
 #define VAR_NAME(x) #x
@@ -143,8 +142,8 @@ void Cheats::PenetrateWalls()
 	auto* Gun = Character->GetEquippedWeapon();
 
 	Gun->CurrentAmmoType.PenetrationDistance = 100000;
-	Gun->CurrentAmmoType.PenetrationLevel = 10;
-	Gun->PenetrationDistance = 10000; // Move this
+	Gun->CurrentAmmoType.PenetrationLevel = 100;
+	Gun->PenetrationDistance = 100000; 
 	Gun->bArmorPiercing = true;
 
 }
@@ -216,27 +215,24 @@ void Cheats::SetFireRate(float FireRateMult)
 void Cheats::RemoveSpread()
 {
 	if (!GVars.ReadyOrNotChar)
-	{
-		Utils::Error("Character Invalid: RemoveSpread ; Misc.cpp");
 		return;
-	}
-	if (!GVars.ReadyOrNotChar->GetEquippedWeapon())
-	{
-		Utils::Error("Weapon Invalid: RemoveSpread ; Misc.cpp");
-		return;
-	}
 
 	ABaseMagazineWeapon* Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
+	if (!Gun || !Utils::IsValidActor(Gun))
+		return;
 
-	// Spread removal
+	// Core spread
 	Gun->SpreadPattern = FRotator();
 	Gun->PendingSpread = FRotator();
 	Gun->SpreadReturnRate = 0.0f;
 	Gun->FirstShotSpread = 0.0f;
+	Gun->FirstShotResetTime = 0.0f;
 	Gun->VelocitySpreadMultiplier = 0.0f;
-	Gun->VelocityRecoilMultiplier = 0.0f;
 	Gun->ADSSpreadMultiplier = 0.0f;
 	Gun->bIgnoreAmmoTypeSpread = true;
+
+	// Also feeds the cone (especially hip-fire / movement)
+	Gun->VelocityRecoilMultiplier = 0.0f;
 }
 
 void Cheats::RemoveRecoil()
@@ -357,7 +353,7 @@ void Cheats::ApplyPersistentWeaponSettings()
 	}
 
 	ABaseMagazineWeapon* Weapon = GVars.ReadyOrNotChar->GetEquippedWeapon();
-	if (!Weapon)
+	if (!Weapon || !Utils::IsValidActor(Weapon))
 	{
 		LastWeapon = nullptr;
 		return;
@@ -370,9 +366,22 @@ void Cheats::ApplyPersistentWeaponSettings()
 		LastPenetration != CVars.KeepPenetration ||
 		LastInstaKill != CVars.KeepInstaKill ||
 		LastHighFireRate != CVars.KeepHighFireRate;
-	if (GVars.World == LastWorld && GVars.Level == LastLevel &&
-		GVars.ReadyOrNotChar == LastCharacter &&
-		Weapon == LastWeapon && !SettingsChanged)
+
+	const bool ContextChanged =
+		GVars.World != LastWorld ||
+		GVars.Level != LastLevel ||
+		GVars.ReadyOrNotChar != LastCharacter ||
+		Weapon != LastWeapon;
+
+	// Always re-apply spread/recoil every tick while enabled
+	// (game rewrites these on fire / reload / movement)
+	if (CVars.KeepNoSpread)
+		RemoveSpread();
+	if (CVars.KeepNoRecoil)
+		RemoveRecoil();
+
+	// One-shot style cheats only need to run on change
+	if (!ContextChanged && !SettingsChanged)
 		return;
 
 	LastWorld = GVars.World;
@@ -386,10 +395,6 @@ void Cheats::ApplyPersistentWeaponSettings()
 	LastInstaKill = CVars.KeepInstaKill;
 	LastHighFireRate = CVars.KeepHighFireRate;
 
-	if (CVars.KeepNoRecoil)
-		RemoveRecoil();
-	if (CVars.KeepNoSpread)
-		RemoveSpread();
 	if (CVars.KeepAutoFire)
 		AddAutoFire();
 	if (CVars.KeepPenetration)

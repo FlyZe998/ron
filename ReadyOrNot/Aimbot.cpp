@@ -95,7 +95,7 @@ void Cheats::Aimbot(bool DrawVisuals)
 			AimbotSettings.MinDistance,
 			AimbotSettings.MaxDistance
 		);
-		NextTargetSearch = Now + std::chrono::milliseconds(40);
+		NextTargetSearch = Now + std::chrono::milliseconds(20);
 	}
 
 	AActor* Target = LastTarget;
@@ -116,7 +116,7 @@ void Cheats::Aimbot(bool DrawVisuals)
 
 	if (AimbotSettings.Prediction)
 	{
-		float ProjectileSpeed = 37000.0f; // Random default I made.
+		float ProjectileSpeed = 37000.0f; 
 		if (GVars.ReadyOrNotChar->GetEquippedWeapon())
 		{
 			float WeaponProjectileSpeed = GVars.ReadyOrNotChar->GetEquippedWeapon()->ProjectileMovementSpeed;

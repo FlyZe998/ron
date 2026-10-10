@@ -5,7 +5,6 @@
 
 using namespace SDK;
 
-// can return nullptr
 UWorld* Utils::GetWorldSafe() 
 {
     UEngine* Engine = UEngine::GetEngine();
@@ -15,7 +14,6 @@ UWorld* Utils::GetWorldSafe()
     return Engine->GameViewport->World;
 }
 
-// can return nullptr
 APlayerController* Utils::GetPlayerController()
 {
 	APlayerController* PlayerController = nullptr;
@@ -95,13 +93,12 @@ FVector Utils::FRotatorToVector(const FRotator& Rot)
     double SY = sin(YawRad);
 
     return FVector(
-        CP * CY,   // X
-        CP * SY,   // Y
-        SP         // Z
-    ).GetNormalized(); // normalize just in case
+        CP * CY,   
+        CP * SY,   
+        SP         
+    ).GetNormalized(); 
 }
 
-// Helper function to get or create player cheat data
 PlayerCheatData& Utils::GetPlayerCheats(APlayerCharacter* Player)
 {
     return PlayerCheatMap[Player];
@@ -146,7 +143,7 @@ Overlay::Point Utils::FVector2DToScreenPoint(FVector2D Vector)
 FRotator Utils::GetRotationToTarget(const FVector& Start, const FVector& Target)
 {
     FVector Delta = Target - Start;
-    Delta.Normalize(); // Important for safe calculations
+    Delta.Normalize(); 
 
     FRotator Rotation;
     Rotation.Pitch = std::atan2(Delta.Z, std::sqrt(Delta.X * Delta.X + Delta.Y * Delta.Y)) * (180.0f / std::numbers::pi);
@@ -217,7 +214,6 @@ AActor* Utils::GetBestTarget(APlayerController* ViewPoint, bool TargetCivs, bool
 	            bool bIsCivilian = ReadyOrNotChar->IsCivilian();
             	bool bIsSuspect = ReadyOrNotChar->IsSuspect();
 
-            	// Keep target if suspect OR (civilian AND TargetCivs)
             	if (!(bIsSuspect || (bIsCivilian && TargetCivs)))
             		continue;
             }
@@ -236,7 +232,6 @@ AActor* Utils::GetBestTarget(APlayerController* ViewPoint, bool TargetCivs, bool
 		if (!ReadyOrNotChar->Mesh)
 			continue;
 
-        // Get the target bone location
         FVector BoneLocation = ReadyOrNotChar->Mesh->GetBoneTransform(BoneName, ERelativeTransformSpace::RTS_World).Translation;
 		const double Distance = CameraLocation.GetDistanceToInMeters(BoneLocation);
 		if (Distance < MinDistance || Distance > MaxDistance)
@@ -317,7 +312,6 @@ void cerrf(const char* Format, ...)
     va_list Args;
     va_start(Args, Format);
 
-    // Print to stderr
     vfprintf(stderr, Format, Args);
 
     va_end(Args);

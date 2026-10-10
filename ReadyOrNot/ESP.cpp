@@ -156,7 +156,7 @@ void Cheats::RenderESP()
     ULevel* Level = GVars.Level;
     if (!Level) return; 
 
-    TArray<AActor*> ActorsCopy = Level->Actors; // snapshot to prevent mid-iteration changes causing crashes
+    TArray<AActor*> ActorsCopy = Level->Actors; 
 	if (ActorsCopy.Num() == 0) return;
 
 	TArray<AActor*> IgnoreActors;
