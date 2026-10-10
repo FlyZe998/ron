@@ -209,7 +209,7 @@ void Cheats::SetFireRate(float FireRateMult)
 	
 	printf("Original Fire Rate: %f\n", Gun->FireRate);
 
-	Gun->FireRate = 60.0f / FireRateMult; // Fire rate has to be adjusted from RPM to delay between shots
+	Gun->FireRate = 60.0f / FireRateMult; 
 }
 
 void Cheats::RemoveSpread()
@@ -221,7 +221,6 @@ void Cheats::RemoveSpread()
 	if (!Gun || !Utils::IsValidActor(Gun))
 		return;
 
-	// Core spread
 	Gun->SpreadPattern = FRotator();
 	Gun->PendingSpread = FRotator();
 	Gun->SpreadReturnRate = 0.0f;
@@ -230,8 +229,6 @@ void Cheats::RemoveSpread()
 	Gun->VelocitySpreadMultiplier = 0.0f;
 	Gun->ADSSpreadMultiplier = 0.0f;
 	Gun->bIgnoreAmmoTypeSpread = true;
-
-	// Also feeds the cone (especially hip-fire / movement)
 	Gun->VelocityRecoilMultiplier = 0.0f;
 }
 
@@ -251,7 +248,6 @@ void Cheats::RemoveRecoil()
 	APlayerCharacter* Character = reinterpret_cast<APlayerCharacter*>(GVars.ReadyOrNotChar);
 	ABaseMagazineWeapon * Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
 
-	// Recoil removal
 	Gun->RecoilMultiplierPitch = 0.0f;
 	Gun->RecoilMultiplierYaw = 0.0f;
 	Gun->FirstShotRecoil = 0.0f;
@@ -373,14 +369,11 @@ void Cheats::ApplyPersistentWeaponSettings()
 		GVars.ReadyOrNotChar != LastCharacter ||
 		Weapon != LastWeapon;
 
-	// Always re-apply spread/recoil every tick while enabled
-	// (game rewrites these on fire / reload / movement)
 	if (CVars.KeepNoSpread)
 		RemoveSpread();
 	if (CVars.KeepNoRecoil)
 		RemoveRecoil();
 
-	// One-shot style cheats only need to run on change
 	if (!ContextChanged && !SettingsChanged)
 		return;
 
