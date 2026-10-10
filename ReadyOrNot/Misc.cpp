@@ -70,30 +70,64 @@ void Cheats::ToggleGodMode() {
 	LastRequestedState = CVars.GodMode;
 }
 
-void Cheats::ToggleInfAmmo() {
+void Cheats::ToggleInfAmmo()
+{
 	static ABaseMagazineWeapon* LastInfiniteAmmoWeapon = nullptr;
 	static UWorld* LastInfiniteAmmoWorld = nullptr;
 	static ULevel* LastInfiniteAmmoLevel = nullptr;
 	static bool WasEnabled = false;
+
+	
 	if (!CVars.InfAmmo && !WasEnabled)
 		return;
-	if (!GVars.ReadyOrNotChar)
+
+	
+	if (!GVars.World || !GVars.Level || !GVars.ReadyOrNotChar ||
+		!Utils::IsValidActor(GVars.ReadyOrNotChar))
+	{
+		LastInfiniteAmmoWeapon = nullptr;
+		LastInfiniteAmmoWorld = nullptr;
+		LastInfiniteAmmoLevel = nullptr;
+		WasEnabled = false;
 		return;
+	}
 
 	ABaseMagazineWeapon* Gun = GVars.ReadyOrNotChar->GetEquippedWeapon();
-	if (!Gun)
-		return;
 
-	const bool EnabledNow = CVars.InfAmmo && !WasEnabled;
-	const bool WeaponChanged = Gun != LastInfiniteAmmoWeapon ||
-		GVars.World != LastInfiniteAmmoWorld || GVars.Level != LastInfiniteAmmoLevel;
-	if (Gun->bInfiniteAmmo != CVars.InfAmmo)
-		Gun->bInfiniteAmmo = CVars.InfAmmo;
-	if (CVars.InfAmmo && (WeaponChanged || EnabledNow))
+	
+	if (!Gun || !Utils::IsValidActor(Gun))
+	{
+		LastInfiniteAmmoWeapon = nullptr;
+		WasEnabled = CVars.InfAmmo; 
+		return;
+	}
+
+	
+	if (GVars.World != LastInfiniteAmmoWorld || GVars.Level != LastInfiniteAmmoLevel)
+	{
+		LastInfiniteAmmoWeapon = nullptr;
+		LastInfiniteAmmoWorld = GVars.World;
+		LastInfiniteAmmoLevel = GVars.Level;
+	}
+
+	
+	Gun->bInfiniteAmmo = CVars.InfAmmo;
+
+	if (CVars.InfAmmo)
+	{
 		Gun->ReplenishAmmo();
+
+		
+		if (Gun->GetAmmo() < 3.0f)
+		{
+			FMagazine NewMag;
+			NewMag.Ammo = Gun->MagazineCountDefault;
+			NewMag.AmmoType = 1;
+			Gun->Server_AddMagazine(NewMag);
+		}
+	}
+
 	LastInfiniteAmmoWeapon = Gun;
-	LastInfiniteAmmoWorld = GVars.World;
-	LastInfiniteAmmoLevel = GVars.Level;
 	WasEnabled = CVars.InfAmmo;
 }
 
