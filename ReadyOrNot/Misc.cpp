@@ -115,6 +115,7 @@ void Cheats::PenetrateWalls()
 	Gun->CurrentAmmoType.PenetrationDistance = 100000;
 	Gun->CurrentAmmoType.PenetrationLevel = 10;
 	Gun->PenetrationDistance = 10000; // Move this
+	Gun->bArmorPiercing = true;
 
 }
 
