@@ -34,8 +34,7 @@ permissions.
 
 ## Weapon tab
 
-- **Infinite Ammo** — requests infinite ammunition for the equipped weapon
-  where supported.
+- **Infinite Ammo** — requests infinite ammunition for the equipped weapon.
 - **Multi Fire** — configures the multi-fire value; zero disables additional
   shots.
 - **Keep No Recoil**, **Keep No Spread**, **Keep Auto Fire**,
