@@ -305,7 +305,7 @@ void Cheats::RenderESP()
             const FVector BoneLocation = BoneTransform.Translation;
             if (!Utils::SafeProjectWorldLocationToScreen(GVars.PlayerController, BoneLocation, &ScreenPosition, true))
             {
-                return true;
+                return false;
             }
 
             return true;
