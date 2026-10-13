@@ -87,6 +87,8 @@ namespace
 	HWND MenuWindow = nullptr;
 	HWND TabControl = nullptr;
 	HWND PageContainer = nullptr;
+	HWND ScrollBarWindow = nullptr;
+	constexpr int ScrollBarWidth = 12;
 	HWND ToolTipWindow = nullptr;
 	HANDLE MenuThreadHandle = nullptr;
 	HANDLE MenuReadyEvent = nullptr;
@@ -287,11 +289,18 @@ namespace
 			DrawTextW(DrawItem.hDC, Text.c_str(), TextLength, &TextBounds, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_END_ELLIPSIS);
 		}
 
-		if (DrawItem.itemState & ODS_FOCUS)
+		if ((DrawItem.itemState & ODS_FOCUS) && !(DrawItem.itemState & ODS_NOFOCUSRECT) && !IsDisabled)
 		{
-			RECT FocusBounds = Bounds;
-			InflateRect(&FocusBounds, -4, -4);
-			DrawFocusRect(DrawItem.hDC, &FocusBounds);
+			// Keyboard focus: thin dim-cyan frame instead of the white dotted rectangle.
+			const COLORREF FocusColor = RGB(0, 150, 160);
+			const RECT Inner{ Bounds.left + 4, Bounds.top + 4, Bounds.right - 4, Bounds.bottom - 4 };
+			if (Inner.right - Inner.left > 4 && Inner.bottom - Inner.top > 4)
+			{
+				FillSolid(DrawItem.hDC, RECT{ Inner.left, Inner.top, Inner.right, Inner.top + 1 }, FocusColor);
+				FillSolid(DrawItem.hDC, RECT{ Inner.left, Inner.bottom - 1, Inner.right, Inner.bottom }, FocusColor);
+				FillSolid(DrawItem.hDC, RECT{ Inner.left, Inner.top, Inner.left + 1, Inner.bottom }, FocusColor);
+				FillSolid(DrawItem.hDC, RECT{ Inner.right - 1, Inner.top, Inner.right, Inner.bottom }, FocusColor);
+			}
 		}
 	}
 
@@ -315,7 +324,9 @@ namespace
 			return;
 		SetBkMode(DrawItem.hDC, TRANSPARENT);
 		SetTextColor(DrawItem.hDC, IsSelected ? RGB(0, 0, 0) : IsHot ? MenuTextColor : MenuMutedTextColor);
-		DrawTextW(DrawItem.hDC, Text, -1, &Bounds, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_END_ELLIPSIS);
+		RECT TextBounds = Bounds;
+		InflateRect(&TextBounds, 2, 0);
+		DrawTextW(DrawItem.hDC, Text, -1, &TextBounds, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_END_ELLIPSIS);
 	}
 
 	LRESULT CALLBACK TabControlProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam,
@@ -787,6 +798,138 @@ namespace
 			RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 	}
 
+	void ScrollPage(int Command, int TrackPosition);
+
+	// Geometry shared by painting and mouse handling of the custom scrollbar.
+	bool GetScrollGeometry(RECT& Track, RECT& Thumb, int& MaximumOffset)
+	{
+		Track = RECT{};
+		Thumb = RECT{};
+		MaximumOffset = 0;
+		if (!PageContainer || !ScrollBarWindow)
+			return false;
+
+		RECT View{};
+		GetClientRect(PageContainer, &View);
+		RECT Bar{};
+		GetClientRect(ScrollBarWindow, &Bar);
+		const int ViewHeight = static_cast<int>(View.bottom);
+		MaximumOffset = (std::max)(0, PageContentHeight - ViewHeight);
+		Track = RECT{ 0, 2, Bar.right, Bar.bottom - 2 };
+		const int TrackHeight = static_cast<int>(Track.bottom - Track.top);
+		if (MaximumOffset <= 0 || TrackHeight <= 0 || PageContentHeight <= 0)
+			return false;
+
+		const int ThumbHeight = (std::min)(TrackHeight, (std::max)(28, MulDiv(TrackHeight, ViewHeight, PageContentHeight)));
+		const int Travel = TrackHeight - ThumbHeight;
+		const int ThumbTop = static_cast<int>(Track.top) + (Travel > 0 ? MulDiv(Travel, PageScrollOffset, MaximumOffset) : 0);
+		Thumb = RECT{ 0, ThumbTop, Bar.right, ThumbTop + ThumbHeight };
+		return true;
+	}
+
+	LRESULT CALLBACK ScrollBarProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam,
+		UINT_PTR SubclassId, DWORD_PTR)
+	{
+		static bool Dragging = false;
+		static bool Hot = false;
+		static int GrabOffset = 0;
+		switch (Message)
+		{
+		case WM_NCHITTEST:
+			return HTCLIENT;
+		case WM_ERASEBKGND:
+			return TRUE;
+		case WM_PAINT:
+		{
+			PAINTSTRUCT Paint{};
+			HDC Dc = BeginPaint(Window, &Paint);
+			if (Dc)
+			{
+				RECT Client{};
+				GetClientRect(Window, &Client);
+				FillRect(Dc, &Client, MenuBackgroundBrush);
+				RECT Track{}, Thumb{};
+				int MaximumOffset = 0;
+				if (GetScrollGeometry(Track, Thumb, MaximumOffset))
+				{
+					const int Middle = static_cast<int>(Client.right) / 2;
+					FillSolid(Dc, RECT{ Middle - 1, Track.top, Middle + 1, Track.bottom }, RGB(40, 40, 50));
+					const COLORREF ThumbColor = (Dragging || Hot) ? MenuAccent2Color : MenuAccentColor;
+					DrawChamferRect(Dc, RECT{ Middle - 4, Thumb.top, Middle + 4, Thumb.bottom }, ThumbColor, ThumbColor, 3);
+				}
+			}
+			EndPaint(Window, &Paint);
+			return 0;
+		}
+		case WM_LBUTTONDOWN:
+		{
+			RECT Track{}, Thumb{};
+			int MaximumOffset = 0;
+			if (!GetScrollGeometry(Track, Thumb, MaximumOffset))
+				return 0;
+			const int Y = GET_Y_LPARAM(LParam);
+			if (Y >= Thumb.top && Y < Thumb.bottom)
+			{
+				Dragging = true;
+				GrabOffset = Y - static_cast<int>(Thumb.top);
+				SetCapture(Window);
+				InvalidateRect(Window, nullptr, FALSE);
+			}
+			else
+				ScrollPage(Y < Thumb.top ? SB_PAGEUP : SB_PAGEDOWN, 0);
+			return 0;
+		}
+		case WM_MOUSEMOVE:
+		{
+			TRACKMOUSEEVENT Track{ sizeof(Track), TME_LEAVE, Window, 0 };
+			TrackMouseEvent(&Track);
+			RECT TrackRect{}, Thumb{};
+			int MaximumOffset = 0;
+			const bool HasThumb = GetScrollGeometry(TrackRect, Thumb, MaximumOffset);
+			const int Y = GET_Y_LPARAM(LParam);
+			const bool NewHot = HasThumb && Y >= Thumb.top && Y < Thumb.bottom;
+			if (NewHot != Hot)
+			{
+				Hot = NewHot;
+				InvalidateRect(Window, nullptr, FALSE);
+			}
+			if (Dragging && HasThumb)
+			{
+				const int Travel = static_cast<int>(TrackRect.bottom - TrackRect.top) - static_cast<int>(Thumb.bottom - Thumb.top);
+				if (Travel > 0)
+				{
+					const int Wanted = std::clamp(Y - GrabOffset - static_cast<int>(TrackRect.top), 0, Travel);
+					ScrollPage(SB_THUMBTRACK, MulDiv(Wanted, MaximumOffset, Travel));
+				}
+			}
+			return 0;
+		}
+		case WM_LBUTTONUP:
+		case WM_CAPTURECHANGED:
+			if (Dragging)
+			{
+				Dragging = false;
+				if (GetCapture() == Window)
+					ReleaseCapture();
+				InvalidateRect(Window, nullptr, FALSE);
+			}
+			return 0;
+		case WM_MOUSELEAVE:
+			if (Hot)
+			{
+				Hot = false;
+				InvalidateRect(Window, nullptr, FALSE);
+			}
+			return 0;
+		case WM_MOUSEWHEEL:
+			return SendMessageW(MenuWindow, Message, WParam, LParam);
+		case WM_NCDESTROY:
+			RemoveWindowSubclass(Window, ScrollBarProc, SubclassId);
+			break;
+		}
+		return DefSubclassProc(Window, Message, WParam, LParam);
+	}
+
 	void UpdatePageScrollBar()
 	{
 		if (!PageContainer)
@@ -794,16 +937,13 @@ namespace
 
 		RECT Client{};
 		GetClientRect(PageContainer, &Client);
-		SCROLLINFO ScrollInfo{};
-		ScrollInfo.cbSize = sizeof(ScrollInfo);
-		ScrollInfo.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
-		ScrollInfo.nMin = 0;
-		ScrollInfo.nMax = (std::max)(0, PageContentHeight - 1);
-		ScrollInfo.nPage = static_cast<UINT>((std::max)(0L, Client.bottom));
-		const int MaximumOffset = (std::max)(0, PageContentHeight - static_cast<int>(ScrollInfo.nPage));
+		const int MaximumOffset = (std::max)(0, PageContentHeight - static_cast<int>((std::max)(0L, Client.bottom)));
 		PageScrollOffset = std::clamp(PageScrollOffset, 0, MaximumOffset);
-		ScrollInfo.nPos = PageScrollOffset;
-		SetScrollInfo(PageContainer, SB_VERT, &ScrollInfo, TRUE);
+		if (ScrollBarWindow)
+		{
+			ShowWindow(ScrollBarWindow, MaximumOffset > 0 ? SW_SHOWNA : SW_HIDE);
+			InvalidateRect(ScrollBarWindow, nullptr, FALSE);
+		}
 		ApplyPageScroll();
 	}
 
@@ -1186,8 +1326,12 @@ namespace
 				Window, nullptr, ModuleInstance, nullptr);
 			StyleControl(SessionLabel);
 			PageContainer = CreateWindowExW(0, PageWindowClassName, L"",
-				WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
-				10, 78, Client.right - 20, Client.bottom - 88, Window, nullptr, ModuleInstance, nullptr);
+				WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+				10, 78, Client.right - 22 - ScrollBarWidth, Client.bottom - 88, Window, nullptr, ModuleInstance, nullptr);
+			ScrollBarWindow = CreateWindowExW(0, L"STATIC", L"", WS_CHILD,
+				Client.right - 10 - ScrollBarWidth, 78, ScrollBarWidth, Client.bottom - 88, Window, nullptr, ModuleInstance, nullptr);
+			if (ScrollBarWindow)
+				SetWindowSubclass(ScrollBarWindow, ScrollBarProc, 3, 0);
 			if (!TabControl || !HeaderLabel || !CreditLabel || !SessionLabel || !PageContainer)
 				return -1;
 			SetWindowTheme(PageContainer, L"DarkMode_Explorer", nullptr);
@@ -1280,7 +1424,13 @@ namespace
 			const int Width = LOWORD(LParam);
 			const int Height = HIWORD(LParam);
 			if (TabControl)
+			{
 				MoveWindow(TabControl, 10, 10, (std::max)(0, Width - 20), 34, TRUE);
+				const int TabCount = TabCtrl_GetItemCount(TabControl);
+				if (TabCount > 0)
+					SendMessageW(TabControl, TCM_SETITEMSIZE, 0,
+						MAKELPARAM(std::clamp((Width - 24) / TabCount, 77, 110), 32));
+			}
 			if (HeaderLabel)
 				MoveWindow(HeaderLabel, 18, 51, 215, 22, TRUE);
 			if (CreditLabel)
@@ -1292,7 +1442,9 @@ namespace
 			}
 			if (PageContainer)
 			{
-				MoveWindow(PageContainer, 10, 78, (std::max)(0, Width - 20), (std::max)(0, Height - 88), TRUE);
+				MoveWindow(PageContainer, 10, 78, (std::max)(0, Width - 22 - ScrollBarWidth), (std::max)(0, Height - 88), TRUE);
+				if (ScrollBarWindow)
+					MoveWindow(ScrollBarWindow, Width - 10 - ScrollBarWidth, 78, ScrollBarWidth, (std::max)(0, Height - 88), TRUE);
 				UpdatePageScrollBar();
 			}
 			InvalidateRect(Window, nullptr, TRUE);

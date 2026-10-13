@@ -8,6 +8,7 @@
 
 // FORWARD DECLARATIONS
 
+
 namespace ANIMBP_Zipcuffs_Placed_FP { struct FAnimBlueprintGeneratedConstantData; }
 
 namespace ANIMBP_Zipcuffs_Placed { struct FAnimBlueprintGeneratedConstantData; }
@@ -15,6 +16,7 @@ namespace ANIMBP_Zipcuffs_Placed { struct FAnimBlueprintGeneratedConstantData; }
 namespace LoadoutCategory { struct FLoadoutCategory; }
 
 namespace ReadyOrNot { struct FLoadoutCategory; }
+
 
 namespace ANIMBP_MK18
 {

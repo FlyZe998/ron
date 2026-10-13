@@ -358,9 +358,9 @@ void hkPlayerProcessEvent(const SDK::UObject* Object, SDK::UFunction* Function, 
 		Cheats::ProcessArrestQueue();
 
 		if (CVars.BulletTime && GVars.World)
-			GVars.World->K2_GetWorldSettings()->TimeDilation = CVars.BulletTimeSpeed; // Slow-mo
+			GVars.World->K2_GetWorldSettings()->TimeDilation = CVars.BulletTimeSpeed;
 		else if (GVars.World)
-			GVars.World->K2_GetWorldSettings()->TimeDilation = 1.0f; // Normal
+			GVars.World->K2_GetWorldSettings()->TimeDilation = 1.0f;
 	}
 
 	oPlayerProcessEvent(Object, Function, Params);
@@ -376,8 +376,13 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 	if (!Object || !Object->Class || !Function)
 		return oProcessEvent(Object, Function, Params);
 
-	std::unique_lock<std::recursive_mutex> SettingsLock(SettingsMutex, std::try_to_lock);
-	if (!SettingsLock.owns_lock())
+	const std::string EarlyName = Function->GetName();
+	const bool IsFire = (EarlyName == "Server_OnFire");
+
+	std::unique_lock<std::recursive_mutex> SettingsLock(SettingsMutex, std::defer_lock);
+	if (IsFire)
+		SettingsLock.lock();
+	else if (!SettingsLock.try_lock())
 		return oProcessEvent(Object, Function, Params);
 
 	if (Function)
@@ -453,7 +458,7 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 			return oProcessEvent(Object, Function, Params);
 		}
 
-		if (CVars.InstantMultiTool && Params && Function->GetName() == "GetMultitoolUseTime") // credit to CrimsonSpark for this instant multitool use time
+		if (CVars.InstantMultiTool && Params && Function->GetName() == "GetMultitoolUseTime")
 		{
 			SettingsLock.unlock();
 			oProcessEvent(Object, Function, Params);
@@ -463,47 +468,67 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 			reinterpret_cast<Params::CanUseMultitoolOn_GetMultitoolUseTime*>(Params)->ReturnValue = 0.01f;
 			return;
 		}
-		else if ((CVars.SilentAim || CVars.ShootFromReticle || CVars.KeepNoSpread))
+
+		if ((CVars.SilentAim || CVars.ShootFromReticle || CVars.KeepNoSpread) && Params)
 		{
-			if (Params && Object->IsA(ABaseMagazineWeapon::StaticClass()) &&
-				strcmp(Function->GetName().c_str(), "Server_OnFire") == 0)
+			if (IsFire &&
+				Object->IsA(ABaseMagazineWeapon::StaticClass()) &&
+				GVars.ReadyOrNotChar &&
+				GVars.PlayerController)
 			{
 				auto* Weapon = const_cast<ABaseMagazineWeapon*>(
 					reinterpret_cast<const ABaseMagazineWeapon*>(Object));
-				const bool OwnerIsLocalPlayer = GVars.ReadyOrNotChar && GVars.PlayerController &&
-					Weapon->Owner == GVars.ReadyOrNotChar;
 
-				if (OwnerIsLocalPlayer)
+				ABaseMagazineWeapon* LocalGun = GVars.ReadyOrNotChar->GetEquippedWeapon();
+				if (Weapon && LocalGun && Weapon == LocalGun)
 				{
 					auto* FireParams =
 						reinterpret_cast<Params::BaseMagazineWeapon_Server_OnFire*>(Params);
 
-					if (CVars.ShootFromReticle)
+					if (CVars.ShootFromReticle || CVars.SilentAim)
 					{
+						if (GVars.PlayerController->PlayerCameraManager)
+						{
+							FireParams->SpawnLoc =
+								GVars.PlayerController->PlayerCameraManager->GetCameraLocation();
+							FireParams->Direction =
+								GVars.PlayerController->PlayerCameraManager->GetCameraRotation();
+						}
+
+						const float SX = GVars.ScreenSize.x > 1.0f ? GVars.ScreenSize.x : 1920.0f;
+						const float SY = GVars.ScreenSize.y > 1.0f ? GVars.ScreenSize.y : 1080.0f;
+
 						FVector SpawnLoc{};
-						FVector Direction{};
+						FVector WorldDir{};
 						if (GVars.PlayerController->DeprojectScreenPositionToWorld(
-							GVars.ScreenSize.x / 2.0f + MiscSettings.ReticlePosition.x,
-							GVars.ScreenSize.y / 2.0f + MiscSettings.ReticlePosition.y,
+							SX * 0.5f + MiscSettings.ReticlePosition.x,
+							SY * 0.5f + MiscSettings.ReticlePosition.y,
 							&SpawnLoc,
-							&Direction))
+							&WorldDir))
 						{
 							FireParams->SpawnLoc = SpawnLoc;
-							FireParams->Direction = UKismetMathLibrary::Conv_VectorToRotator(Direction);
+							FireParams->Direction =
+								UKismetMathLibrary::Conv_VectorToRotator(WorldDir);
 						}
 					}
 
 					if (CVars.KeepNoSpread || CVars.ShootFromReticle)
-						FireParams->Seed = 0;  // kill random cone on the server
+						FireParams->Seed = 0;
 
 					if (CVars.SilentAim)
 						Cheats::SilentAim(FireParams);
 
-					if (!JustFired)
+					if (!JustFired && CVars.MultiFire > 0)
 					{
 						JustFired = true;
-						for (int i = 0; i < CVars.MultiFire; i++)
-							Weapon->Server_OnFire(FireParams->Direction, FireParams->SpawnLoc, FireParams->Seed);
+						const int Extra = CVars.MultiFire;
+						for (int i = 0; i < Extra; ++i)
+						{
+							Weapon->Server_OnFire(
+								FireParams->Direction,
+								FireParams->SpawnLoc,
+								FireParams->Seed);
+						}
 						JustFired = false;
 					}
 				}
@@ -511,7 +536,6 @@ void hkProcessEvent(const UObject* Object, UFunction* Function, void* Params)
 		}
 	}
 
-	// Call original
 	SettingsLock.unlock();
 	oProcessEvent(Object, Function, Params);
 }

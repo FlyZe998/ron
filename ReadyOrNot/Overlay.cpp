@@ -134,6 +134,7 @@ namespace
 		constexpr float TextPaddingX = 5.0f;
 		constexpr float TextCut = 4.0f;
 		constexpr float FontSize = 14.0f;
+		constexpr float RingDashMinRadius = 28.0f;   // big unfilled circles become segmented HUD rings
 	}
 
 	struct HudFonts
@@ -671,6 +672,15 @@ namespace
 					{
 						Gdiplus::SolidBrush Brush(Tint);
 						Graphics.FillEllipse(&Brush, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);
+					}
+					else if (Radius >= HudStyle::RingDashMinRadius)
+					{
+						Gdiplus::Pen BasePen(Gdiplus::Color(ScaleAlpha(Command.Tint.A, 35), Command.Tint.R, Command.Tint.G, Command.Tint.B), 1.0f);
+						Graphics.DrawEllipse(&BasePen, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);
+						Gdiplus::Pen DashPen(Tint, Thickness);
+						const Gdiplus::REAL Pattern[2] = { 8.0f / Thickness, 5.0f / Thickness };
+						DashPen.SetDashPattern(Pattern, 2);
+						Graphics.DrawEllipse(&DashPen, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);
 					}
 					else
 						Graphics.DrawEllipse(&Pen, Command.X1 - Radius, Command.Y1 - Radius, Diameter, Diameter);

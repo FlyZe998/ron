@@ -219,14 +219,14 @@ void Cheats::RemoveSpread()
 		return;
 
 	Gun->SpreadPattern = FRotator();
+	Gun->PendingSpread = FRotator();
 	Gun->SpreadReturnRate = 0.0f;
 	Gun->FirstShotSpread = 0.0f;
-	Gun->FirstShotResetTime = 0.0f;
 	Gun->VelocitySpreadMultiplier = 0.0f;
+	Gun->VelocityRecoilMultiplier = 0.0f;
 	Gun->ADSSpreadMultiplier = 0.0f;
 	Gun->bIgnoreAmmoTypeSpread = true;
-	Gun->VelocityRecoilMultiplier = 0.0f;
-	Gun->PendingSpread = FRotator();
+	Gun->FirstShotResetTime = 0.0f;
 }
 
 void Cheats::RemoveRecoil()
